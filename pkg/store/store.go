@@ -28,7 +28,7 @@ type Account struct {
 
 type RequestLog struct {
 	ID           int64  `json:"id"`
-	APIKey       string `json:"api_key"`
+	APIKey       string `json:"-"`
 	Model        string `json:"model"`
 	Endpoint     string `json:"endpoint"`
 	Stream       bool   `json:"stream"`

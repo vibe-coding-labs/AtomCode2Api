@@ -36,7 +36,6 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(v)
 }
 
@@ -90,7 +89,6 @@ func (h *Handler) serveSettings(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) serveStatic(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodOptions {
-		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.WriteHeader(200)
 		return
 	}

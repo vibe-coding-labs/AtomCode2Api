@@ -36,11 +36,15 @@ pre { background:#f5f5f5; padding:12px; border-radius:4px; overflow-x:auto; font
 </nav>
 <div class="content" id="app"></div>
 <script>
+function esc(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 let state = { stats: null, accounts: [], logs: [], settings: {} };
 
 function showTab(name) {
   document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-  document.querySelector(`nav a[href="#${name}"]`)?.classList.add('active');
+  document.querySelector('nav a[href="#' + name + '"]')?.classList.add('active');
   render(name);
 }
 
@@ -58,7 +62,7 @@ async function loadAll() {
 }
 
 function render(tab) {
-  const app = document.getElementById('app');
+  var app = document.getElementById('app');
   if (tab === 'dashboard') renderDashboard(app);
   else if (tab === 'accounts') renderAccounts(app);
   else if (tab === 'logs') renderLogs(app);
@@ -67,66 +71,47 @@ function render(tab) {
 }
 
 function renderDashboard(el) {
-  const s = state.stats || {};
-  el.innerHTML = `
-    <div class="grid">
-      <div class="card"><h3>Today Requests</h3><div class="stat-value">${s.total_requests || 0}</div></div>
-      <div class="card"><h3>Input Tokens</h3><div class="stat-value">${s.total_input_tokens || 0}</div></div>
-      <div class="card"><h3>Output Tokens</h3><div class="stat-value">${s.total_output_tokens || 0}</div></div>
-      <div class="card"><h3>Accounts</h3><div class="stat-value">${s.accounts_count || 0}</div></div>
-    </div>
-    <div class="card">
-      <h3>Requests by Model</h3>
-      <table>${(s.by_model || []).map(m => `<tr><td>${m.model}</td><td>${m.count}</td></tr>`).join('')}</table>
-    </div>
-    <div class="card">
-      <h3>Status</h3>
-      <div id="health-status">Loading...</div>
-    </div>
-  `;
-  api('/health').then(r => {
+  var s = state.stats || {};
+  el.innerHTML =
+    '<div class="grid">' +
+      '<div class="card"><h3>Today Requests</h3><div class="stat-value">' + (s.total_requests || 0) + '</div></div>' +
+      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">' + (s.total_input_tokens || 0) + '</div></div>' +
+      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">' + (s.total_output_tokens || 0) + '</div></div>' +
+      '<div class="card"><h3>Accounts</h3><div class="stat-value">' + (s.accounts_count || 0) + '</div></div>' +
+    '</div>' +
+    '<div class="card"><h3>Requests by Model</h3><table>' +
+      (s.by_model || []).map(function(m) { return '<tr><td>' + esc(m.model) + '</td><td>' + esc(m.count) + '</td></tr>'; }).join('') +
+    '</table></div>' +
+    '<div class="card"><h3>Status</h3><div id="health-status">Loading...</div></div>';
+  api('/health').then(function(r) {
     document.getElementById('health-status').innerHTML =
-      `<span class="badge ${r.status === 'ok' ? 'ok' : 'err'}">${r.status}</span> Daemon: ${r.daemon?.connected ? '✅' : '❌'}`;
+      '<span class="badge ' + (r.status === 'ok' ? 'ok' : 'err') + '">' + esc(r.status) + '</span> Daemon: ' + (r.daemon && r.daemon.connected ? '✅' : '❌');
   });
 }
 
 function renderAccounts(el) {
-  const accts = state.accounts || [];
-  el.innerHTML = `
-    <div class="card">
-      <h3>Accounts (${accts.length})</h3>
-      <table>
-        <tr><th>User</th><th>Model</th><th>Created</th></tr>
-        ${accts.map(a => `<tr><td>${a.nickname || a.user_id}</td><td>${a.default_model || '-'}</td><td>${a.created_at || '-'}</td></tr>`).join('')}
-      </table>
-    </div>
-  `;
+  var accts = state.accounts || [];
+  el.innerHTML =
+    '<div class="card"><h3>Accounts (' + accts.length + ')</h3><table><tr><th>User</th><th>Model</th><th>Created</th></tr>' +
+    accts.map(function(a) { return '<tr><td>' + esc(a.nickname || a.user_id) + '</td><td>' + esc(a.default_model || '-') + '</td><td>' + esc(a.created_at || '-') + '</td></tr>'; }).join('') +
+    '</table></div>';
 }
 
 function renderLogs(el) {
-  const logs = state.logs || [];
-  el.innerHTML = `
-    <div class="card">
-      <h3>Recent Requests (${logs.length})</h3>
-      <table>
-        <tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>
-        ${logs.map(l => `<tr><td>${l.model || '-'}</td><td>${l.endpoint}</td><td><span class="badge ${l.status_code < 400 ? 'ok' : 'err'}">${l.status_code}</span></td><td>${l.latency_ms}ms</td><td>${l.created_at || ''}</td></tr>`).join('')}
-      </table>
-    </div>
-  `;
+  var logs = state.logs || [];
+  el.innerHTML =
+    '<div class="card"><h3>Recent Requests (' + logs.length + ')</h3><table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
+    logs.map(function(l) { return '<tr><td>' + esc(l.model || '-') + '</td><td>' + esc(l.endpoint) + '</td><td><span class="badge ' + (l.status_code < 400 ? 'ok' : 'err') + '">' + esc(l.status_code) + '</span></td><td>' + (l.latency_ms || 0) + 'ms</td><td>' + esc(l.created_at || '') + '</td></tr>'; }).join('') +
+    '</table></div>';
 }
 
 function renderSettings(el) {
-  const s = state.settings || {};
-  el.innerHTML = `
-    <div class="card">
-      <h3>Settings</h3>
-      <table>
-        <tr><th>Key</th><th>Value</th></tr>
-        ${Object.entries(s).map(([k,v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join('')}
-      </table>
-    </div>
-  `;
+  var s = state.settings || {};
+  var rows = '';
+  for (var k in s) {
+    rows += '<tr><td>' + esc(k) + '</td><td>' + esc(s[k]) + '</td></tr>';
+  }
+  el.innerHTML = '<div class="card"><h3>Settings</h3><table><tr><th>Key</th><th>Value</th></tr>' + rows + '</table></div>';
 }
 
 loadAll();
