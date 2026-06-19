@@ -2,10 +2,10 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"context"
 	"log"
 	"log/slog"
 	"net/http"
@@ -18,6 +18,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/anthropic"
 	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/dashboard"
 	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/openai"
 	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/store"
 )
@@ -55,19 +56,15 @@ func runServe() error {
 	daemonURL := getEnvDefault("ATOMCODE_DAEMON_URL", "http://localhost:13456")
 	client := atmc.NewClient(daemonURL)
 
-	// Open store
 	s, err := store.Open("")
 	if err != nil {
 		log.Printf("Warning: store unavailable: %v", err)
 	}
 
-	// Check daemon readiness
 	if h, err := client.Health(); err != nil || h.Status != "ok" {
 		log.Printf("Warning: daemon at %s not ready: %v", daemonURL, err)
-		log.Printf("Make sure AtomCode daemon is running")
 	} else {
 		log.Printf("Daemon connected: v%s", h.Version)
-		// Check auth
 		if auth, err := client.AuthStatus(); err == nil {
 			if auth.LoggedIn && auth.User != nil {
 				log.Printf("Logged in as: %s", auth.User.Name)
@@ -79,13 +76,14 @@ func runServe() error {
 
 	srv := openai.NewServer(client, s)
 	anth := anthropic.NewHandler(client, s)
+	dash := dashboard.NewHandler(s)
 
 	mux := http.NewServeMux()
 	srv.RegisterRoutes(mux)
 	anth.RegisterRoutes(mux)
+	dash.RegisterRoutes(mux)
 
 	handler := requestLogMiddleware(mux, s)
-
 	if verbose {
 		handler = loggingMiddleware(handler)
 	}
@@ -106,6 +104,8 @@ func runServe() error {
 		fmt.Println("    POST /v1/messages          — Chat (Anthropic/Claude Code format)")
 		fmt.Println("    GET  /v1/models            — Model list")
 		fmt.Println("    GET  /health               — Health check")
+		fmt.Println("    GET  /                     — Dashboard")
+		fmt.Printf("    GET  /api/stats             — Dashboard API\n")
 		fmt.Println()
 		fmt.Println("  Claude Code setup:")
 		fmt.Printf("    export ANTHROPIC_BASE_URL=http://%s\n", addr)
@@ -134,8 +134,6 @@ func runServe() error {
 	return nil
 }
 
-// ─── Middleware ──────────────────────────────────────────────────────────────
-
 func loggingMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
@@ -150,11 +148,9 @@ var requestCounter uint64
 func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-
 		reqID := atomic.AddUint64(&requestCounter, 1)
 		r = anthropic.WithRequestID(r, reqID)
 
-		// Peek at body for model info
 		var model string
 		if r.Method == "POST" && r.Body != nil {
 			bodyBytes, _ := io.ReadAll(io.LimitReader(r.Body, 100<<20))
@@ -171,19 +167,16 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 		rw := &responseWriter{ResponseWriter: w, statusCode: 200}
 		next.ServeHTTP(rw, r)
 
-		// Log /v1/ requests
 		path := r.URL.Path
-		if s != nil && (stringsPrefix(path, "/v1/") || path == "/health") {
+		if s != nil && (len(path) >= 4 && path[:4] == "/v1/" || path == "/health") {
 			apiKey := r.Header.Get("x-api-key")
 			if apiKey == "" {
-				if auth := r.Header.Get("Authorization"); stringsPrefix(auth, "Bearer ") {
-					apiKey = auth[7:]
+				if a := r.Header.Get("Authorization"); len(a) > 7 && a[:7] == "Bearer " {
+					apiKey = a[7:]
 				}
 			}
-
 			isStream := r.URL.Query().Get("stream") != "" || path == "/v1/messages"
 			latency := time.Since(start).Milliseconds()
-
 			var errMsg string
 			if rw.statusCode >= 400 {
 				errMsg = fmt.Sprintf("HTTP %d on %s %s", rw.statusCode, r.Method, path)
@@ -200,7 +193,6 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 					"error", errMsg,
 				)
 			}
-
 			s.LogRequest(apiKey, model, path, isStream, rw.statusCode, latency, errMsg, 0, 0)
 		}
 	})
@@ -222,15 +214,9 @@ func (rw *responseWriter) Write(p []byte) (int, error) {
 	return rw.ResponseWriter.Write(p)
 }
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
 func getEnvDefault(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
 	return def
-}
-
-func stringsPrefix(s, prefix string) bool {
-	return len(s) >= len(prefix) && s[:len(prefix)] == prefix
 }

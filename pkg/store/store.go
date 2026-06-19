@@ -120,6 +120,84 @@ func (s *Store) migrate() error {
 	return err
 }
 
+// ─── Stats & Logs ────────────────────────────────────────────────────────────
+
+type Stats struct {
+	TotalRequests  int            `json:"total_requests"`
+	TotalInputTk   int            `json:"total_input_tokens"`
+	TotalOutputTk  int            `json:"total_output_tokens"`
+	AccountsCount  int            `json:"accounts_count"`
+	AvgLatencyMs   float64        `json:"avg_latency_ms"`
+	ErrorCount     int            `json:"error_count"`
+	StreamCount    int            `json:"stream_count"`
+	SuccessCount   int            `json:"success_count"`
+	ByModel        []ModelCount   `json:"by_model"`
+	ByAccount      []AccountCount `json:"by_account"`
+}
+
+type ModelCount struct {
+	Model string `json:"model"`
+	Count int    `json:"count"`
+}
+
+type AccountCount struct {
+	UserID   string `json:"user_id"`
+	Nickname string `json:"nickname"`
+	Count    int    `json:"count"`
+}
+
+func (s *Store) GetStats() (*Stats, error) {
+	stats := &Stats{}
+	tf := "date(created_at, 'localtime') = date('now', 'localtime')"
+
+	s.db.QueryRow("SELECT COUNT(*) FROM request_logs WHERE "+tf).Scan(&stats.TotalRequests)
+	s.db.QueryRow("SELECT COALESCE(AVG(latency_ms), 0) FROM request_logs WHERE "+tf).Scan(&stats.AvgLatencyMs)
+	s.db.QueryRow("SELECT COUNT(*) FROM accounts").Scan(&stats.AccountsCount)
+	s.db.QueryRow("SELECT COUNT(*) FROM request_logs WHERE "+tf+" AND status_code >= 400").Scan(&stats.ErrorCount)
+	s.db.QueryRow("SELECT COUNT(*) FROM request_logs WHERE "+tf+" AND stream = 1").Scan(&stats.StreamCount)
+	s.db.QueryRow("SELECT COUNT(*) FROM request_logs WHERE "+tf+" AND status_code < 400").Scan(&stats.SuccessCount)
+	s.db.QueryRow("SELECT COALESCE(SUM(input_tokens), 0) FROM request_logs WHERE "+tf).Scan(&stats.TotalInputTk)
+	s.db.QueryRow("SELECT COALESCE(SUM(output_tokens), 0) FROM request_logs WHERE "+tf).Scan(&stats.TotalOutputTk)
+
+	rows, err := s.db.Query("SELECT model, COUNT(*) as cnt FROM request_logs WHERE "+tf+" AND model != '' GROUP BY model ORDER BY cnt DESC")
+	if err == nil {
+		defer rows.Close()
+		for rows.Next() {
+			var mc ModelCount
+			if rows.Scan(&mc.Model, &mc.Count) == nil {
+				stats.ByModel = append(stats.ByModel, mc)
+			}
+		}
+	}
+	return stats, nil
+}
+
+func (s *Store) GetRecentLogs(limit int) ([]RequestLog, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	rows, err := s.db.Query(
+		"SELECT id, api_key, model, endpoint, stream, status_code, latency_ms, COALESCE(error_message, ''), COALESCE(input_tokens, 0), COALESCE(output_tokens, 0), created_at FROM request_logs ORDER BY id DESC LIMIT ?",
+		limit,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	logs := make([]RequestLog, 0)
+	for rows.Next() {
+		var l RequestLog
+		var streamInt int
+		if err := rows.Scan(&l.ID, &l.APIKey, &l.Model, &l.Endpoint, &streamInt, &l.StatusCode, &l.LatencyMs, &l.ErrorMessage, &l.InputTokens, &l.OutputTokens, &l.CreatedAt); err != nil {
+			return nil, err
+		}
+		l.Stream = streamInt == 1
+		logs = append(logs, l)
+	}
+	return logs, rows.Err()
+}
+
 // ─── Accounts ─────────────────────────────────────────────────────────────────
 
 func (s *Store) ListAccounts() ([]Account, error) {
@@ -129,7 +207,7 @@ func (s *Store) ListAccounts() ([]Account, error) {
 	}
 	defer rows.Close()
 
-	var accounts []Account
+	accounts := make([]Account, 0)
 	for rows.Next() {
 		var a Account
 		var isDef int
