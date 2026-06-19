@@ -2,6 +2,7 @@ package atmc
 
 import (
 	"crypto/md5"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -206,5 +207,6 @@ func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) 
 }
 
 func jsonString(s string) string {
-	return `"` + strings.ReplaceAll(s, `"`, `\"`) + `"`
+	b, _ := json.Marshal(s)
+	return string(b)
 }
