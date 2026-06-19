@@ -8,7 +8,6 @@ import (
 )
 
 // ConversationKey generates a deterministic hash for a conversation prefix.
-// Includes all messages except the last user message, plus system prompt.
 func ConversationKey(messages []map[string]any, system string) string {
 	payload := system
 	for i, m := range messages {
@@ -23,7 +22,6 @@ func ConversationKey(messages []map[string]any, system string) string {
 }
 
 // FormatMessages formats the messages list into a single daemon message string.
-// system prompt is handled separately.
 func FormatMessages(messages []map[string]any, systemPrompt string) string {
 	var parts []string
 	for _, m := range messages {
@@ -40,7 +38,7 @@ func FormatMessages(messages []map[string]any, systemPrompt string) string {
 		case "assistant":
 			label = "Assistant"
 		case "system":
-			continue // system is handled separately
+			continue
 		default:
 			label = strings.Title(role)
 		}
@@ -49,7 +47,7 @@ func FormatMessages(messages []map[string]any, systemPrompt string) string {
 	return strings.Join(parts, "\n\n")
 }
 
-// contentString extracts a string from message content (may be string or list).
+// contentString extracts a string from message content.
 func contentString(content any) string {
 	if content == nil {
 		return ""
@@ -88,15 +86,13 @@ func FindProviderForModel(providers []ProviderConfig, model string) string {
 // ─── OpenAI SSE Translation ──────────────────────────────────────────────────
 
 // TranslateToOpenAIChunk converts a daemon SSEEvent to an OpenAI SSE data line.
-// Returns the SSE data string (without "data: " prefix), or empty string to skip.
+// Returns the SSE data string, or empty string to skip, or "__DONE__" to signal completion.
 func TranslateToOpenAIChunk(ev *SSEEvent, model string, toolIdx *int) string {
 	switch ev.Type {
 	case "text":
 		return fmt.Sprintf(`{"choices":[{"delta":{"content":%s},"index":0}]}`, jsonString(ev.Content))
-
 	case "reasoning":
 		return fmt.Sprintf(`{"choices":[{"delta":{"reasoning_content":%s},"index":0}]}`, jsonString(ev.Content))
-
 	case "tool_start":
 		*toolIdx++
 		id := ev.ID
@@ -105,26 +101,17 @@ func TranslateToOpenAIChunk(ev *SSEEvent, model string, toolIdx *int) string {
 		}
 		return fmt.Sprintf(`{"choices":[{"delta":{"tool_calls":[{"index":0,"id":%s,"type":"function","function":{"name":%s,"arguments":%s}}]},"index":0}]}`,
 			jsonString(id), jsonString(ev.Name), jsonString(ev.Arguments))
-
 	case "tool_output":
-		return "" // skip
-
+		return ""
 	case "tool_result":
-		return "" // skip
-
+		return ""
 	case "tokens":
-		return fmt.Sprintf(`{"choices":[],"usage":{"prompt_tokens":%d,"completion_tokens":%d,"total_tokens":%d}}`,
+		return fmt.Sprintf(`{"choices":[],"usage":{"prompt_tokens":%d,"completion_tokens":%d,"total_tokens":%d}`,
 			ev.Prompt, ev.Completion, ev.Total)
-
-	case "done":
+	case "done", "stopped":
 		return "__DONE__"
-
-	case "stopped":
-		return "__DONE__"
-
 	case "error":
 		return fmt.Sprintf(`{"choices":[{"delta":{},"finish_reason":"error","index":0}]}`)
-
 	default:
 		return ""
 	}
@@ -136,12 +123,12 @@ func BuildOpenAIFullChunk(deltaJSON string, model string) string {
 		return ""
 	}
 	return fmt.Sprintf(`{"id":"chatcmpl-atomcode","object":"chat.completion.chunk","created":%d,"model":%s,%s}`,
-		time.Now().Unix(), jsonString(model), deltaJSON[1:]) // strip leading '{'
+		time.Now().Unix(), jsonString(model), deltaJSON[1:])
 }
 
 // ─── Anthropic SSE Translation ───────────────────────────────────────────────
 
-// AnthropicState tracks the state of Anthropic SSE translation.
+// AnthropicState tracks Anthropic SSE translation progress.
 type AnthropicState struct {
 	MessageID    string
 	ContentIndex int
@@ -153,7 +140,6 @@ func NewAnthropicState() *AnthropicState {
 }
 
 // TranslateToAnthropicSSE converts a daemon SSEEvent to Anthropic SSE data lines.
-// Returns a slice of SSE data strings (without "data: " prefix).
 func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) []string {
 	switch ev.Type {
 	case "text":
@@ -169,7 +155,6 @@ func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) 
 		return []string{
 			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
 		}
-
 	case "reasoning":
 		if !state.HasSentStart {
 			state.HasSentStart = true
@@ -183,11 +168,10 @@ func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) 
 		return []string{
 			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
 		}
-
 	case "tool_start":
 		if !state.HasSentStart {
 			state.HasSentStart = true
-			state.ContentIndex = -1 // reset
+			state.ContentIndex = -1
 			return []string{
 				fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
 					jsonString(state.MessageID), jsonString(model), jsonString(model)),
@@ -200,36 +184,22 @@ func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) 
 			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"tool_use","id":%s,"name":%s,"input":{}}}`, state.ContentIndex, jsonString(ev.ID), jsonString(ev.Name)),
 			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"input_json_delta","partial_json":%s}}`, state.ContentIndex, jsonString(ev.Arguments)),
 		}
-
-	case "tool_output":
+	case "tool_output", "tool_result":
 		return nil
-
-	case "tool_result":
-		return nil
-
 	case "tokens":
 		return []string{
 			fmt.Sprintf(`{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":%d,"input_tokens":%d},"message":%s}`,
 				ev.Completion, ev.Prompt, jsonString(state.MessageID)),
 		}
-
-	case "done":
+	case "done", "stopped":
 		return []string{
 			`{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{}}`,
 			`{"type":"message_stop"}`,
 		}
-
-	case "stopped":
-		return []string{
-			`{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{}}`,
-			`{"type":"message_stop"}`,
-		}
-
 	case "error":
 		return []string{
 			fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%s}}`, jsonString(ev.Message)),
 		}
-
 	default:
 		return nil
 	}
