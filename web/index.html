@@ -62,6 +62,7 @@ var tab = window.location.hash.slice(1) || 'dashboard';
 window.addEventListener('hashchange', function() { tab = window.location.hash.slice(1) || 'dashboard'; render(); });
 
 function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function attrEsc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/'/g,'&#x27;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function jsonStr(s) { return JSON.stringify(s||''); }
 
 function api(method, path, body) {
@@ -188,13 +189,13 @@ function renderAccounts(el) {
     accts.map(function(a,i){
       return '<tr>' +
         '<td>'+(i+1)+'</td>' +
-        '<td><a href="#detail" data-uid="'+esc(a.user_id)+'" class="account-link" style="cursor:pointer;color:#1a1a2e">'+esc(a.nickname||a.user_id)+'</a></td>' +
+        '<td><a href="#detail" data-uid="'+attrEsc(a.user_id)+'" class="account-link" style="cursor:pointer;color:#1a1a2e">'+esc(a.nickname||a.user_id)+'</a></td>' +
         '<td><code>'+esc((a.api_token||'').slice(0,20))+'...</code></td>' +
         '<td>'+esc(a.default_model||'-')+'</td>' +
         '<td>'+(a.today_requests||0)+'</td>' +
         '<td>'+(a.total_requests||0)+'</td>' +
         '<td><span class="badge '+(a.credential_valid===1?'ok':a.credential_valid===0?'err':'warn')+'">'+(a.credential_valid===1?'Valid':a.credential_valid===0?'Expired':'?')+'</span></td>' +
-        '<td><button data-uid="'+esc(a.user_id)+'" class="btn-delete-account btn-danger btn-sm">Del</button></td></tr>';
+        '<td><button data-uid="'+attrEsc(a.user_id)+'" class="btn-delete-account btn-danger btn-sm">Del</button></td></tr>';
     }).join('') +
     '</table></div>';
 }
@@ -296,8 +297,8 @@ function buildAccountDetailHTML() {
   return '' +
     '<div class="flex-between"><h2 style="font-size:18px;margin-bottom:12px">Account: '+esc(d.uid)+'</h2>' +
     '<div class="flex">' +
-      '<button data-uid="'+esc(d.uid)+'" class="btn-renew-token btn-sm mr-2">🔑 Renew Token</button>' +
-      '<button data-uid="'+esc(d.uid)+'" class="btn-validate btn-sm mr-2">✅ Validate</button>' +
+      '<button data-uid="'+attrEsc(d.uid)+'" class="btn-renew-token btn-sm mr-2">🔑 Renew Token</button>' +
+      '<button data-uid="'+attrEsc(d.uid)+'" class="btn-validate btn-sm mr-2">✅ Validate</button>' +
       '<button onclick="showTab(\'accounts\')" class="btn-sm">← Back</button>' +
     '</div></div>' +
     '<div class="grid">' +
@@ -348,7 +349,7 @@ function renderErrors(el) {
       errs.map(function(e){
         return '<tr><td>'+esc(e.model||'-')+'</td><td>'+esc(e.endpoint)+'</td>' +
           '<td><span class="badge err">'+e.status_code+'</span></td>' +
-          '<td><span data-title="'+esc(e.error_message)+'">'+esc((e.error_message||'').slice(0,60))+'</span></td>' +
+          '<td><span data-title="'+attrEsc(e.error_message)+'">'+esc((e.error_message||'').slice(0,60))+'</span></td>' +
           '<td>'+esc(e.created_at||'')+'</td></tr>';
       }).join('')+'</table></div>';
   }).catch(function(){
