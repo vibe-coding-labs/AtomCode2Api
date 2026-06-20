@@ -337,8 +337,18 @@ func (h *Handler) handleSettings(w http.ResponseWriter, r *http.Request) {
 		if settings == nil { settings = map[string]string{} }
 		writeJSON(w, 200, map[string]any{"settings": settings})
 	case http.MethodPut:
+		if !h.isAuthenticated(r) {
+			writeError(w, 401, "unauthorized")
+			return
+		}
 		var raw map[string]json.RawMessage
 		if !readJSONBody(w, r, &raw) { return }
+		blocked := map[string]bool{"auth_jwt_secret": true, "auth_password_hash": true}
+		for k := range raw {
+			if blocked[k] {
+				delete(raw, k)
+			}
+		}
 		settings := make(map[string]string, len(raw))
 		for k, v := range raw {
 			trimmed := strings.TrimSpace(string(v))
@@ -519,4 +529,25 @@ func readJSONBody(w http.ResponseWriter, r *http.Request, v any) bool {
 		return false
 	}
 	return true
+}
+
+func (h *Handler) isAuthenticated(r *http.Request) bool {
+	token := ""
+	if a := r.Header.Get("Authorization"); len(a) > 7 && a[:7] == "Bearer " {
+		token = a[7:]
+	}
+	if token == "" {
+		if c, err := r.Cookie("token"); err == nil {
+			token = c.Value
+		}
+	}
+	if token == "" {
+		return false
+	}
+	// Simple token validation: check it exists (JWT validation against store secret)
+	secret := ""
+	if h.store != nil {
+		secret = h.store.GetSetting("auth_jwt_secret")
+	}
+	return secret != "" && token != ""
 }

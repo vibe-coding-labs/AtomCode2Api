@@ -168,7 +168,7 @@ function renderAccounts(el) {
           '<td>' + (a.today_requests||0) + '</td>' +
           '<td><span class="badge ' + (a.credential_valid===1?'ok':a.credential_valid===0?'err':'warn') + '">' +
             (a.credential_valid===1?'Valid':a.credential_valid===0?'Expired':'Unknown') + '</span></td>' +
-          '<td><button onclick="deleteAccount(\''+esc(a.user_id)+'\')" class="btn-danger" style="font-size:12px;padding:4px 10px">Delete</button></td></tr>';
+          '<td><button data-userid="' + esc(a.user_id) + '" class="btn-delete-account btn-danger" style="font-size:12px;padding:4px 10px">Delete</button></td></tr>';
       }).join('') +
       '</table></div>';
 }
@@ -195,6 +195,13 @@ function submitAddAccount() {
 function closeModal() { var m = document.getElementById('add-modal'); if(m) m.remove(); }
 function deleteAccount(id) { if(!confirm('Delete account '+id+'?')) return; apiDel('/api/accounts/'+id).then(function(){loadAll();}); }
 function showDeleteAll() { if(!confirm('Delete ALL accounts?')) return; apiPost('/api/accounts-clear-all').then(function(){loadAll();}); }
+
+// Event delegation for delete buttons
+document.addEventListener('click', function(e) {
+  if (e.target.classList.contains('btn-delete-account')) {
+    deleteAccount(e.target.getAttribute('data-userid'));
+  }
+});
 
 // ─── Logs ───────────────────────────────────────────────────────────────────
 function renderLogs(el) {

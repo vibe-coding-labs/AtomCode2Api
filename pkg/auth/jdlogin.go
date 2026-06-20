@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -178,10 +179,9 @@ func GenerateToken(userID, secret string, expiry time.Duration) (string, error) 
 }
 
 func hmacSHA256(data, key string) []byte {
-	h := sha256.New()
-	h.Write([]byte(key))
-	h.Write([]byte(data))
-	return h.Sum(nil)
+	m := hmac.New(sha256.New, []byte(key))
+	m.Write([]byte(data))
+	return m.Sum(nil)
 }
 
 func init() {
