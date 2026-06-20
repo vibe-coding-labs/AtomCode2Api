@@ -181,14 +181,14 @@ function renderAccounts(el) {
         '<button class="btn-primary btn-sm mr-2" onclick="showAddAccount()">+ Add</button>' +
         '<button class="btn-sm mr-2" onclick="showImport()">📥 Import</button>' +
         '<button class="btn-sm mr-2" onclick="doExport()">📤 Export</button>' +
-        '<button class="btn-danger btn-sm" onclick="if(confirm(\'Delete all?\'))apiPost(\'/api/accounts-clear-all\').then(loadAll)">Clear</button>' +
+        '<button class="btn-danger btn-sm btn-clear-all">Clear</button>' +
       '</div>' +
     '</div>' +
     '<table><tr><th>#</th><th>User</th><th>Token</th><th>Model</th><th>24h Req</th><th>All Req</th><th>Status</th><th>Actions</th></tr>' +
     accts.map(function(a,i){
       return '<tr>' +
         '<td>'+(i+1)+'</td>' +
-        '<td><a href="#detail" onclick="selectAccount(\''+esc(a.user_id)+'\')" style="cursor:pointer;color:#1a1a2e">'+esc(a.nickname||a.user_id)+'</a></td>' +
+        '<td><a href="#detail" data-uid="'+esc(a.user_id)+'" class="account-link" style="cursor:pointer;color:#1a1a2e">'+esc(a.nickname||a.user_id)+'</a></td>' +
         '<td><code>'+esc((a.api_token||'').slice(0,20))+'...</code></td>' +
         '<td>'+esc(a.default_model||'-')+'</td>' +
         '<td>'+(a.today_requests||0)+'</td>' +
@@ -217,12 +217,15 @@ document.addEventListener('click', function(e){
     var uid = e.target.getAttribute('data-uid');
     apiPost('/api/accounts/'+uid+'/validate').then(function(r){ alert(r.valid?'✅ Valid':'❌ Invalid/Expired'); });
   }
+  if (e.target.classList.contains('btn-clear-all')) {
+    if (confirm('Delete all accounts?')) apiPost('/api/accounts-clear-all').then(loadAll);
+  }
+  if (e.target.classList.contains('account-link')) {
+    e.preventDefault();
+    tab = 'detail';
+    loadAccountDetail(e.target.getAttribute('data-uid'));
+  }
 });
-
-function selectAccount(uid) {
-  tab = 'detail';
-  loadAccountDetail(uid);
-}
 
 // Add Account Modal
 function showAddAccount() {
@@ -345,7 +348,7 @@ function renderErrors(el) {
       errs.map(function(e){
         return '<tr><td>'+esc(e.model||'-')+'</td><td>'+esc(e.endpoint)+'</td>' +
           '<td><span class="badge err">'+e.status_code+'</span></td>' +
-          '<td><span title="'+esc(e.error_message)+'">'+esc((e.error_message||'').slice(0,60))+'</span></td>' +
+          '<td><span data-title="'+esc(e.error_message)+'">'+esc((e.error_message||'').slice(0,60))+'</span></td>' +
           '<td>'+esc(e.created_at||'')+'</td></tr>';
       }).join('')+'</table></div>';
   }).catch(function(){
