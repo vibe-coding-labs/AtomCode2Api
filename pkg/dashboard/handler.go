@@ -241,6 +241,16 @@ func (h *Handler) handleAccountAction(w http.ResponseWriter, r *http.Request) {
 		if !readJSONBody(w, r, &b) { return }
 		if err := h.store.UpdateRemark(userID, b.Remark); err != nil { writeError(w, 500, err.Error()); return }
 		writeJSON(w, 200, map[string]any{"ok": true})
+	case action == "validate" && r.Method == http.MethodPost:
+		account, err := h.store.GetAccount(userID)
+		if err != nil { writeError(w, 500, err.Error()); return }
+		if account == nil { writeError(w, 404, "account not found"); return }
+		writeJSON(w, 200, map[string]any{"api_key": userID, "valid": account.PtKey != ""})
+	case action == "models" && r.Method == http.MethodGet:
+		writeJSON(w, 200, map[string]any{"models": []map[string]string{
+			{"id": "deepseek-v4-flash", "name": "DeepSeek V4 Flash"},
+			{"id": "deepseek-chat", "name": "DeepSeek Chat"},
+		}})
 	default:
 		writeError(w, 405, "method not allowed")
 	}

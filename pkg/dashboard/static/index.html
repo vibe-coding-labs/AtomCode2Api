@@ -10,11 +10,12 @@ body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif
 header { background:#1a1a2e; color:#fff; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
 header h1 { font-size:20px; }
 header .version { font-size:12px; color:#889; }
-nav { display:flex; gap:4px; padding:8px 24px; background:#fff; border-bottom:1px solid #e8e8e8; }
+header .header-info { font-size:13px; color:#aab; }
+nav { display:flex; gap:4px; padding:8px 24px; background:#fff; border-bottom:1px solid #e8e8e8; flex-wrap:wrap; }
 nav a { padding:6px 14px; text-decoration:none; color:#666; border-radius:6px; font-size:14px; cursor:pointer; }
 nav a:hover { background:#f5f5f5; }
 nav a.active { color:#1a1a2e; background:#e8e8ff; font-weight:600; }
-.content { padding:20px 24px; max-width:1200px; margin:0 auto; }
+.content { padding:20px 24px; max-width:1200px; margin:0 auto; min-height:60vh; }
 .card { background:#fff; border-radius:8px; padding:20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,.08); }
 .card h3 { font-size:13px; color:#888; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
 .stat-value { font-size:28px; font-weight:700; color:#1a1a2e; }
@@ -30,214 +31,379 @@ button { padding:8px 20px; border:none; border-radius:6px; cursor:pointer; font-
 .btn-primary { background:#1a1a2e; color:#fff; }
 .btn-primary:hover { background:#2a2a4e; }
 .btn-danger { background:#d32f2f; color:#fff; }
-input[type="text"],input[type="password"],select { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:14px; width:100%; }
+.btn-sm { font-size:12px; padding:4px 10px; }
+input[type="text"],input[type="password"],input[type="search"],select { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:14px; width:100%; }
 label { display:block; margin-bottom:4px; font-size:13px; color:#555; }
 .mb-2 { margin-bottom:12px; }
 .mr-2 { margin-right:8px; }
 .flex { display:flex; align-items:center; gap:8px; }
+.flex-between { display:flex; align-items:center; justify-content:space-between; }
 .mt-2 { margin-top:12px; }
 .text-center { text-align:center; }
 pre { background:#f8f8f8; padding:12px; border-radius:4px; overflow-x:auto; font-size:12px; }
+code { background:#f0f0f0; padding:2px 6px; border-radius:3px; font-size:12px; }
+.modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,.4); display:flex; align-items:center; justify-content:center; z-index:1000; }
+.modal { background:#fff; border-radius:8px; padding:24px; width:90%; max-width:480px; max-height:80vh; overflow-y:auto; }
+.modal h3 { margin-bottom:12px; }
+.bar-chart { display:flex; align-items:flex-end; gap:2px; height:60px; padding:4px 0; }
+.bar { display:inline-block; width:14px; min-height:3px; border-radius:2px 2px 0 0; background:#1a1a2e; position:relative; }
+.bar:hover { opacity:.7; }
+.bar-tip { display:none; position:absolute; bottom:100%; left:50%; transform:translateX(-50%); background:#333; color:#fff; padding:2px 6px; border-radius:4px; font-size:10px; white-space:nowrap; z-index:10; }
+.bar:hover .bar-tip { display:block; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 <script>
-// ─── State & Router ─────────────────────────────────────────────────────────
-let state = { stats:null, accounts:[], logs:[], settings:{}, auth:{initialized:false}, token: localStorage.getItem('token'), models:[] };
-let currentTab = window.location.hash.slice(1) || 'dashboard';
+// ─── State ────────────────────────────────────────────────────────────────────
+var S = { stats:null, accounts:[], logs:[], settings:{}, auth:{initialized:false}, token: localStorage.getItem('token'), models:[], accountDetail:null };
+var tab = window.location.hash.slice(1) || 'dashboard';
 
-window.addEventListener('hashchange', () => { currentTab = window.location.hash.slice(1) || 'dashboard'; render(); });
+window.addEventListener('hashchange', function() { tab = window.location.hash.slice(1) || 'dashboard'; render(); });
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function jsonStr(s) { return JSON.stringify(s||''); }
 
 function api(method, path, body) {
   var opts = {method:method, headers:{'Content-Type':'application/json'}};
-  if (state.token) opts.headers['Authorization'] = 'Bearer ' + state.token;
+  if (S.token) opts.headers['Authorization'] = 'Bearer ' + S.token;
   if (body) opts.body = JSON.stringify(body);
-  return fetch(path, opts).then(r => r.json());
+  return fetch(path, opts).then(function(r){ return r.json(); });
 }
-function apiGet(path) { return api('GET', path); }
-function apiPost(path, body) { return api('POST', path, body); }
-function apiPut(path, body) { return api('PUT', path, body); }
-function apiDel(path) { return api('DELETE', path); }
+function apiGet(p) { return api('GET',p); }
+function apiPost(p,b) { return api('POST',p,b); }
+function apiPut(p,b) { return api('PUT',p,b); }
+function apiDel(p) { return api('DELETE',p); }
 
-function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function showTab(name) { tab = name; window.location.hash = name; render(); }
 
-function showTab(name) {
-  currentTab = name;
-  window.location.hash = name;
-  render();
-}
-
-// ─── App ─────────────────────────────────────────────────────────────────────
 async function loadAll() {
-  try { state.stats = await apiGet('/api/stats'); } catch(e) {}
-  try { var a = await apiGet('/api/accounts'); state.accounts = a.accounts || []; } catch(e) {}
-  try { var s = await apiGet('/api/settings'); state.settings = s.settings || {}; } catch(e) {}
-  try { state.auth = await apiGet('/api/auth/status'); } catch(e) {}
-  try { state.modelsRes = await apiGet('/api/models'); state.models = state.modelsRes.models || []; } catch(e) {}
+  try { S.stats = await apiGet('/api/stats'); } catch(e){}
+  try { var a=await apiGet('/api/accounts'); S.accounts=a.accounts||[]; } catch(e){}
+  try { var s=await apiGet('/api/settings'); S.settings=s.settings||{}; } catch(e){}
+  try { S.auth=await apiGet('/api/auth/status'); } catch(e){}
+  try { var m=await apiGet('/api/models'); S.models=m.models||[]; } catch(e){}
   render();
 }
 
+// ─── Router ───────────────────────────────────────────────────────────────────
 function render() {
   var app = document.getElementById('root');
-  if (!state.auth.initialized && !state.token) { renderLogin(app); return; }
-  app.innerHTML = '<header><h1>🔌 AtomCode Proxy <span class="version">v0.1.0</span></h1><div><span id="header-info"></span></div></header>' +
-    '<nav>' +
-      '<a class="' + (currentTab==='dashboard'?'active':'') + '" onclick="showTab(\'dashboard\')">📊 Dashboard</a>' +
-      '<a class="' + (currentTab==='accounts'?'active':'') + '" onclick="showTab(\'accounts\')">👤 Accounts</a>' +
-      '<a class="' + (currentTab==='logs'?'active':'') + '" onclick="showTab(\'logs\')">📋 Request Logs</a>' +
-      '<a class="' + (currentTab==='settings'?'active':'') + '" onclick="showTab(\'settings\')">⚙️ Settings</a>' +
+  if (!S.auth.initialized && !S.token) { renderLogin(app); return; }
+  app.innerHTML =
+    '<header><h1>🔌 AtomCode Proxy <span class="version">v0.1.0</span></h1><div><span class="header-info" id="hdr-info"></span></div></header>' +
+    '<nav id="nav-bar">' +
+      '<a class="'+(tab==='dashboard'?'active':'')+'" onclick="showTab(\'dashboard\')">📊 Dashboard</a>' +
+      '<a class="'+(tab==='accounts'?'active':'')+'" onclick="showTab(\'accounts\')">👤 Accounts</a>' +
+      '<a class="'+(tab==='detail'?'active':'')+'" onclick="showTab(\'detail\')">🔍 Account Detail</a>' +
+      '<a class="'+(tab==='logs'?'active':'')+'" onclick="showTab(\'logs\')">📋 Logs</a>' +
+      '<a class="'+(tab==='errors'?'active':'')+'" onclick="showTab(\'errors\')">⚠️ Errors</a>' +
+      '<a class="'+(tab==='settings'?'active':'')+'" onclick="showTab(\'settings\')">⚙️ Settings</a>' +
     '</nav><div class="content" id="app-content"></div>';
-  var info = document.getElementById('header-info');
-  info.textContent = state.accounts.length + ' accounts';
+  document.getElementById('hdr-info').textContent = S.accounts.length+' accounts';
   renderContent();
 }
 
 function renderContent() {
   var el = document.getElementById('app-content');
   if (!el) return;
-  if (currentTab === 'dashboard') renderDashboard(el);
-  else if (currentTab === 'accounts') renderAccounts(el);
-  else if (currentTab === 'logs') renderLogs(el);
-  else if (currentTab === 'settings') renderSettings(el);
-  else if (currentTab === 'login') renderLoginContent(el);
+  if (tab==='dashboard') renderDashboard(el);
+  else if (tab==='accounts') renderAccounts(el);
+  else if (tab==='detail') renderAccountDetail(el);
+  else if (tab==='logs') renderLogs(el);
+  else if (tab==='errors') renderErrors(el);
+  else if (tab==='settings') renderSettings(el);
   else renderDashboard(el);
 }
 
-// ─── Login ──────────────────────────────────────────────────────────────────
+// ─── Login ────────────────────────────────────────────────────────────────────
 function renderLogin(app) {
   app.innerHTML = '<div style="max-width:400px;margin:100px auto;text-align:center">' +
     '<h1 style="margin-bottom:24px">🔌 AtomCode Proxy</h1>' +
     '<div class="card" id="login-card">' +
-      (state.auth.initialized ? '' : '<p>首次使用，请设置管理员密码</p>') +
+      (S.auth.initialized ? '' : '<p style="margin-bottom:12px;color:#666">首次使用，请设置管理员密码</p>') +
       '<div class="mb-2"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" /></div>' +
-      (state.auth.initialized ? '' : '<div class="mb-2"><label>Confirm</label><input type="password" id="login-pwd2" placeholder="Confirm password" /></div>') +
-      '<button class="btn-primary" onclick="doLogin()">' + (state.auth.initialized ? 'Login' : 'Setup') + '</button>' +
+      (S.auth.initialized ? '' : '<div class="mb-2"><label>Confirm</label><input type="password" id="login-pwd2" placeholder="Confirm password" /></div>') +
+      '<button class="btn-primary" onclick="doLogin()">'+(S.auth.initialized?'Login':'Setup')+'</button>' +
       '<p id="login-err" style="color:red;margin-top:8px"></p>' +
     '</div></div>';
 }
+
 function doLogin() {
   var pwd = document.getElementById('login-pwd').value;
-  if (state.auth.initialized) {
-    apiPost('/api/auth/login', {password:pwd}).then(r => {
-      if (r.ok) { state.token = r.token; localStorage.setItem('token', r.token); render(); }
-      else { document.getElementById('login-err').textContent = r.detail || 'Login failed'; }
+  if (S.auth.initialized) {
+    apiPost('/api/auth/login', {password:pwd}).then(function(r){
+      if (r.ok) { S.token=r.token; localStorage.setItem('token',r.token); render(); }
+      else { document.getElementById('login-err').textContent = r.detail||'Login failed'; }
     });
   } else {
     var pwd2 = document.getElementById('login-pwd2').value;
-    if (pwd !== pwd2) { document.getElementById('login-err').textContent = 'Passwords do not match'; return; }
-    apiPost('/api/auth/setup', {password:pwd}).then(r => {
-      if (r.ok) { state.token = r.token; localStorage.setItem('token', r.token); state.auth.initialized = true; render(); }
-      else { document.getElementById('login-err').textContent = r.detail || 'Setup failed'; }
+    if (pwd!==pwd2) { document.getElementById('login-err').textContent = 'Passwords do not match'; return; }
+    apiPost('/api/auth/setup',{password:pwd}).then(function(r){
+      if (r.ok) { S.token=r.token; localStorage.setItem('token',r.token); S.auth.initialized=true; render(); }
+      else { document.getElementById('login-err').textContent = r.detail||'Setup failed'; }
     });
   }
 }
 
-// ─── Dashboard ──────────────────────────────────────────────────────────────
+// ─── Dashboard ────────────────────────────────────────────────────────────────
 function renderDashboard(el) {
-  var s = state.stats || {};
+  var s = S.stats || {};
+  var hourly = s.hourly || [];
+  var maxH = hourly.reduce(function(m,h){ return Math.max(m, h.count||0); }, 0);
   el.innerHTML =
     '<div class="grid">' +
-      '<div class="card"><h3>Today Requests</h3><div class="stat-value">' + (s.total_requests||0) + '</div></div>' +
-      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">' + (s.total_input_tokens||0) + '</div></div>' +
-      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">' + (s.total_output_tokens||0) + '</div></div>' +
-      '<div class="card"><h3>Accounts</h3><div class="stat-value">' + (s.accounts_count||0) + '</div></div>' +
+      '<div class="card"><h3>Today Requests</h3><div class="stat-value">'+(s.total_requests||0)+'</div></div>' +
+      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">'+(s.total_input_tokens||0)+'</div></div>' +
+      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">'+(s.total_output_tokens||0)+'</div></div>' +
+      '<div class="card"><h3>Accounts</h3><div class="stat-value">'+(s.accounts_count||0)+'</div></div>' +
     '</div>' +
+    '<div class="card"><h3>24h Hourly Breakdown</h3><div class="bar-chart">' +
+      hourly.map(function(h){
+        var pct = maxH>0 ? (h.count/maxH)*55 : 0;
+        return '<div class="bar" style="height:'+Math.max(3,pct)+'px"><span class="bar-tip">'+esc(h.hour)+': '+h.count+' reqs, '+h.input_tokens+' in / '+h.output_tokens+' out</span></div>';
+      }).join('') +
+    '</div></div>' +
     '<div class="card"><h3>Requests by Model</h3><table>' +
-      (s.by_model||[]).map(function(m){return '<tr><td>'+esc(m.model)+'</td><td>'+m.count+'</td></tr>';}).join('') +
+      (s.by_model||[]).map(function(m){ return '<tr><td>'+esc(m.model)+'</td><td>'+m.count+'</td></tr>'; }).join('') +
     '</table></div>' +
-    '<div class="card"><h3>24h Hourly Breakdown</h3><div id="hourly-chart">' +
-      (s.hourly||[]).map(function(h){return '<span title="'+esc(h.hour)+': '+h.count+' reqs" style="display:inline-block;width:12px;margin:1px;height:'+Math.max(3,((h.count||0)/20)*40)+'px;background:#1a1a2e;border-radius:2px"></span>';}).join('') +
-    '</div></div>';
+    '<div class="card"><h3>All-time Totals</h3>' +
+      (s.all_time ? '<table><tr><td>Requests</td><td>'+(s.all_time.total_requests||0)+'</td><td>Errors</td><td>'+(s.all_time.error_count||0)+'</td></tr></table>' : '') +
+    '</div>';
 }
 
-// ─── Accounts ───────────────────────────────────────────────────────────────
+// ─── Accounts ─────────────────────────────────────────────────────────────────
 function renderAccounts(el) {
-  var accts = state.accounts || [];
+  var accts = S.accounts || [];
   el.innerHTML =
-    '<div class="card">' +
-      '<div class="flex" style="justify-content:space-between"><h3>Accounts (' + accts.length + '/10)</h3>' +
-        '<div><button class="btn-primary mr-2" onclick="showAddAccount()">+ Add Account</button>' +
-        '<button onclick="showDeleteAll()" class="btn-danger">Clear All</button></div>' +
+    '<div class="card"><div class="flex-between mb-2"><h3>Accounts ('+accts.length+'/10)</h3>' +
+      '<div class="flex">' +
+        '<button class="btn-primary btn-sm mr-2" onclick="showAddAccount()">+ Add</button>' +
+        '<button class="btn-sm mr-2" onclick="showImport()">📥 Import</button>' +
+        '<button class="btn-sm mr-2" onclick="doExport()">📤 Export</button>' +
+        '<button class="btn-danger btn-sm" onclick="if(confirm(\'Delete all?\'))apiPost(\'/api/accounts-clear-all\').then(loadAll)">Clear</button>' +
       '</div>' +
-      '<table><tr><th>User</th><th>API Token</th><th>Model</th><th>Req(24h)</th><th>Valid</th><th>Actions</th></tr>' +
-      accts.map(function(a){
-        return '<tr><td>' + esc(a.nickname||a.user_id) + '</td>' +
-          '<td><code style="font-size:11px">' + esc(a.api_token).slice(0,16) + '...</code></td>' +
-          '<td>' + esc(a.default_model||'-') + '</td>' +
-          '<td>' + (a.today_requests||0) + '</td>' +
-          '<td><span class="badge ' + (a.credential_valid===1?'ok':a.credential_valid===0?'err':'warn') + '">' +
-            (a.credential_valid===1?'Valid':a.credential_valid===0?'Expired':'Unknown') + '</span></td>' +
-          '<td><button data-userid="' + esc(a.user_id) + '" class="btn-delete-account btn-danger" style="font-size:12px;padding:4px 10px">Delete</button></td></tr>';
-      }).join('') +
-      '</table></div>';
+    '</div>' +
+    '<table><tr><th>#</th><th>User</th><th>Token</th><th>Model</th><th>24h Req</th><th>All Req</th><th>Status</th><th>Actions</th></tr>' +
+    accts.map(function(a,i){
+      return '<tr>' +
+        '<td>'+(i+1)+'</td>' +
+        '<td><a href="#detail" onclick="selectAccount(\''+esc(a.user_id)+'\')" style="cursor:pointer;color:#1a1a2e">'+esc(a.nickname||a.user_id)+'</a></td>' +
+        '<td><code>'+esc((a.api_token||'').slice(0,20))+'...</code></td>' +
+        '<td>'+esc(a.default_model||'-')+'</td>' +
+        '<td>'+(a.today_requests||0)+'</td>' +
+        '<td>'+(a.total_requests||0)+'</td>' +
+        '<td><span class="badge '+(a.credential_valid===1?'ok':a.credential_valid===0?'err':'warn')+'">'+(a.credential_valid===1?'Valid':a.credential_valid===0?'Expired':'?')+'</span></td>' +
+        '<td><button data-uid="'+esc(a.user_id)+'" class="btn-delete-account btn-danger btn-sm">Del</button></td></tr>';
+    }).join('') +
+    '</table></div>';
 }
-function showAddAccount() {
-  document.getElementById('app-content').innerHTML +=
-    '<div id="add-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000">' +
-    '<div class="card" style="width:400px"><h3>Add Account</h3>' +
-    '<div class="mb-2"><label>User ID</label><input type="text" id="add-userid" /></div>' +
-    '<div class="mb-2"><label>API Key / PtKey</label><input type="text" id="add-ptkey" /></div>' +
-    '<div class="mb-2"><label>Nickname</label><input type="text" id="add-nickname" /></div>' +
-    '<div><button class="btn-primary mr-2" onclick="submitAddAccount()">Save</button>' +
-    '<button onclick="closeModal()">Cancel</button></div></div></div>';
-}
-function submitAddAccount() {
-  apiPost('/api/accounts', {
-    user_id: document.getElementById('add-userid').value,
-    pt_key: document.getElementById('add-ptkey').value,
-    nickname: document.getElementById('add-nickname').value
-  }).then(function(r) {
-    if (r.ok) { closeModal(); loadAll(); }
-    else { alert(r.detail || 'Failed'); }
-  });
-}
-function closeModal() { var m = document.getElementById('add-modal'); if(m) m.remove(); }
-function deleteAccount(id) { if(!confirm('Delete account '+id+'?')) return; apiDel('/api/accounts/'+id).then(function(){loadAll();}); }
-function showDeleteAll() { if(!confirm('Delete ALL accounts?')) return; apiPost('/api/accounts-clear-all').then(function(){loadAll();}); }
 
 // Event delegation for delete buttons
-document.addEventListener('click', function(e) {
+document.addEventListener('click', function(e){
   if (e.target.classList.contains('btn-delete-account')) {
-    deleteAccount(e.target.getAttribute('data-userid'));
+    var uid = e.target.getAttribute('data-uid');
+    if (confirm('Delete account "'+uid+'"?') ) apiDel('/api/accounts/'+uid).then(loadAll);
+  }
+  if (e.target.classList.contains('btn-renew-token')) {
+    var uid = e.target.getAttribute('data-uid');
+    apiPost('/api/accounts/'+uid+'/renew-token').then(function(r){ if(r.ok) alert('New token: '+r.api_token); });
+  }
+  if (e.target.classList.contains('btn-set-default')) {
+    var uid = e.target.getAttribute('data-uid');
+    apiPut('/api/accounts/'+uid+'/default').then(loadAll);
+  }
+  if (e.target.classList.contains('btn-validate')) {
+    var uid = e.target.getAttribute('data-uid');
+    apiPost('/api/accounts/'+uid+'/validate').then(function(r){ alert(r.valid?'✅ Valid':'❌ Invalid/Expired'); });
   }
 });
 
-// ─── Logs ───────────────────────────────────────────────────────────────────
-function renderLogs(el) {
-  var logs = state.logs || [];
-  el.innerHTML =
-    '<div class="card"><h3>Recent Requests (' + logs.length + ')</h3>' +
-    '<table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
-    logs.map(function(l){
-      return '<tr><td>' + esc(l.model||'-') + '</td><td>' + esc(l.endpoint) + '</td>' +
-        '<td><span class="badge ' + (l.status_code<400?'ok':'err') + '">' + l.status_code + '</span></td>' +
-        '<td>' + l.latency_ms + 'ms</td><td>' + esc(l.created_at||'') + '</td></tr>';
-    }).join('') + '</table></div>';
+function selectAccount(uid) {
+  tab = 'detail';
+  loadAccountDetail(uid);
 }
 
-// ─── Settings ───────────────────────────────────────────────────────────────
-function renderSettings(el) {
-  var s = state.settings || {};
-  el.innerHTML =
-    '<div class="card"><h3>Settings</h3><table><tr><th>Key</th><th>Value</th></tr>' +
-    Object.keys(s).map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+esc(s[k])+'</td></tr>';}).join('') +
-    '</table></div>' +
-    '<div class="card"><h3>Change Password</h3>' +
-    '<div class="mb-2"><label>Current password</label><input type="password" id="chg-old" /></div>' +
-    '<div class="mb-2"><label>New password</label><input type="password" id="chg-new" /></div>' +
-    '<button class="btn-primary" onclick="changePassword()">Change</button><p id="chg-msg" style="margin-top:8px"></p></div>';
+// Add Account Modal
+function showAddAccount() {
+  showModal(
+    '<h3>Add Account</h3>' +
+    '<div class="mb-2"><label>User ID</label><input type="text" id="add-uid" /></div>' +
+    '<div class="mb-2"><label>PtKey / API Key</label><input type="text" id="add-ptkey" /></div>' +
+    '<div class="mb-2"><label>Nickname</label><input type="text" id="add-nick" /></div>' +
+    '<button class="btn-primary mr-2" onclick="submitAddAccount()">Save</button><button onclick="closeModal()">Cancel</button>'
+  );
 }
-function changePassword() {
-  apiPost('/api/auth/change-password', {
-    old_password: document.getElementById('chg-old').value,
-    new_password: document.getElementById('chg-new').value
-  }).then(function(r) {
-    document.getElementById('chg-msg').textContent = r.ok ? '✅ Password changed' : '❌ ' + (r.detail||'Failed');
+function submitAddAccount() {
+  apiPost('/api/accounts', {
+    user_id: document.getElementById('add-uid').value,
+    pt_key: document.getElementById('add-ptkey').value,
+    nickname: document.getElementById('add-nick').value
+  }).then(function(r){ if(r.ok){ closeModal(); loadAll(); } else { alert(r.detail||'Failed'); } });
+}
+
+// Import
+function showImport() {
+  showModal(
+    '<h3>Import Accounts</h3>' +
+    '<div class="mb-2"><label>Paste JSON export data</label><textarea id="import-json" style="width:100%;height:150px;padding:8px;border:1px solid #ddd;border-radius:6px;font-family:monospace;font-size:12px"></textarea></div>' +
+    '<button class="btn-primary mr-2" onclick="submitImport()">Import</button><button onclick="closeModal()">Cancel</button>'
+  );
+}
+function submitImport() {
+  try {
+    var data = JSON.parse(document.getElementById('import-json').value);
+    apiPost('/api/accounts-import', data).then(function(r){
+      if(r.ok){ alert('Added: '+r.added+', Updated: '+r.updated); closeModal(); loadAll(); }
+      else { alert(r.detail||'Import failed'); }
+    });
+  } catch(e) { alert('Invalid JSON: '+e.message); }
+}
+
+function doExport() {
+  apiGet('/api/accounts-export').then(function(r){
+    if(r.ok){
+      var w=window.open('','_blank');
+      w.document.write('<pre>'+esc(JSON.stringify({accounts:r.accounts},null,2))+'</pre>');
+    }
   });
 }
 
-// ─── Init ───────────────────────────────────────────────────────────────────
+// ─── Account Detail ───────────────────────────────────────────────────────────
+function loadAccountDetail(uid) {
+  S.accountDetail = null;
+  Promise.all([
+    apiGet('/api/accounts/'+uid+'/stats'),
+    apiGet('/api/accounts/'+uid+'/logs?limit=50'),
+    apiGet('/api/accounts/'+uid+'/models'),
+  ]).then(function(results){
+    S.accountDetail = { uid:uid, stats:results[0], logs:results[1], models:results[2] };
+    render();
+    document.getElementById('app-content').innerHTML = buildAccountDetailHTML();
+  }).catch(function(){ render(); });
+}
+
+function buildAccountDetailHTML() {
+  var d = S.accountDetail;
+  if (!d) return '<p>Loading...</p>';
+  var st = d.stats || {};
+  var hourly = st.hourly || [];
+  var logs = (d.logs&&d.logs.logs) || [];
+  var models = (d.models&&d.models.models) || [];
+  return '' +
+    '<div class="flex-between"><h2 style="font-size:18px;margin-bottom:12px">Account: '+esc(d.uid)+'</h2>' +
+    '<div class="flex">' +
+      '<button data-uid="'+esc(d.uid)+'" class="btn-renew-token btn-sm mr-2">🔑 Renew Token</button>' +
+      '<button data-uid="'+esc(d.uid)+'" class="btn-validate btn-sm mr-2">✅ Validate</button>' +
+      '<button onclick="showTab(\'accounts\')" class="btn-sm">← Back</button>' +
+    '</div></div>' +
+    '<div class="grid">' +
+      '<div class="card"><h3>24h Requests</h3><div class="stat-value">'+(st.total_requests||0)+'</div></div>' +
+      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">'+(st.total_input_tokens||0)+'</div></div>' +
+      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">'+(st.total_output_tokens||0)+'</div></div>' +
+      '<div class="card"><h3>Success Rate</h3><div class="stat-value">'+((st.total_requests||0)>0 ? Math.round(((st.total_requests-(st.error_count||0))/(st.total_requests||1))*100)+'%' : '-')+'</div></div>' +
+    '</div>' +
+    (st.all_time ? '<div class="card"><h3>All-time Totals</h3><table><tr><td>Requests</td><td>'+(st.all_time.total_requests||0)+'</td><td>Errors</td><td>'+(st.all_time.error_count||0)+'</td></tr></table></div>' : '') +
+    '<div class="card"><h3>24h Breakdown</h3><div class="bar-chart">' +
+      hourly.map(function(h){
+        return '<div class="bar" style="height:'+Math.max(3,((h.count||0)/20)*40)+'px"><span class="bar-tip">'+esc(h.hour)+': '+h.count+' reqs</span></div>';
+      }).join('') +
+    '</div></div>' +
+    '<div class="card"><h3>Recent Logs ('+logs.length+')</h3><table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
+    logs.map(function(l){
+      return '<tr><td>'+esc(l.model||'-')+'</td><td>'+esc(l.endpoint)+'</td>' +
+        '<td><span class="badge '+(l.status_code<400?'ok':'err')+'">'+l.status_code+'</span></td>' +
+        '<td>'+(l.latency_ms||0)+'ms</td><td>'+esc(l.created_at||'')+'</td></tr>';
+    }).join('')+'</table></div>';
+}
+
+// ─── Logs ─────────────────────────────────────────────────────────────────────
+function renderLogs(el) {
+  fetch('/api/logs').then(function(r){return r.json();}).then(function(data){
+    el.innerHTML = buildLogsHTML(data);
+  }).catch(function(){
+    el.innerHTML = buildLogsHTML([]);
+  });
+}
+
+function buildLogsHTML(logs) {
+  return '<div class="card"><h3>Request Logs ('+(logs.length||0)+')</h3>' +
+    '<table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
+    (logs||[]).map(function(l){
+      return '<tr><td>'+esc(l.model||'-')+'</td><td>'+esc(l.endpoint)+'</td>' +
+        '<td><span class="badge '+(l.status_code<400?'ok':'err')+'">'+l.status_code+'</span></td>' +
+        '<td>'+(l.latency_ms||0)+'ms</td><td>'+esc(l.created_at||'')+'</td></tr>';
+    }).join('')+'</table></div>';
+}
+
+// ─── Errors ───────────────────────────────────────────────────────────────────
+function renderErrors(el) {
+  apiGet('/api/errors').then(function(r){
+    var errs = r.errors || [];
+    el.innerHTML = '<div class="card"><h3>Error Logs ('+(errs.length)+')</h3>' +
+      '<table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Message</th><th>Time</th></tr>' +
+      errs.map(function(e){
+        return '<tr><td>'+esc(e.model||'-')+'</td><td>'+esc(e.endpoint)+'</td>' +
+          '<td><span class="badge err">'+e.status_code+'</span></td>' +
+          '<td><span title="'+esc(e.error_message)+'">'+esc((e.error_message||'').slice(0,60))+'</span></td>' +
+          '<td>'+esc(e.created_at||'')+'</td></tr>';
+      }).join('')+'</table></div>';
+  }).catch(function(){
+    el.innerHTML = '<div class="card"><h3>Error Logs</h3><p>No data</p></div>';
+  });
+}
+
+// ─── Settings ─────────────────────────────────────────────────────────────────
+function renderSettings(el) {
+  var s = S.settings || {};
+  el.innerHTML =
+    '<div class="card"><h3>Configuration</h3><table><tr><th>Key</th><th>Value</th></tr>' +
+    Object.keys(s).map(function(k){
+      if (k==='auth_password_hash'||k==='auth_jwt_secret') return '';
+      return '<tr><td>'+esc(k)+'</td><td>'+esc(s[k])+'</td></tr>';
+    }).join('')+'</table></div>' +
+    '<div class="card"><h3>Change Password</h3>' +
+    '<div class="mb-2"><label>Current password</label><input type="password" id="chg-old" /></div>' +
+    '<div class="mb-2"><label>New password</label><input type="password" id="chg-new" /></div>' +
+    '<button class="btn-primary" onclick="changePwd()">Change</button><p id="chg-msg" style="margin-top:8px"></p></div>' +
+    '<div class="card"><h3>Add Setting</h3>' +
+    '<div class="mb-2"><label>Key</label><input type="text" id="set-key" /></div>' +
+    '<div class="mb-2"><label>Value</label><input type="text" id="set-val" /></div>' +
+    '<button class="btn-primary" onclick="addSetting()">Set</button><p id="set-msg" style="margin-top:8px"></p></div>';
+}
+
+function changePwd() {
+  apiPost('/api/auth/change-password', {
+    old_password: document.getElementById('chg-old').value,
+    new_password: document.getElementById('chg-new').value
+  }).then(function(r){
+    document.getElementById('chg-msg').textContent = r.ok ? '✅ Changed' : '❌ '+(r.detail||'Failed');
+  });
+}
+
+function addSetting() {
+  var k = document.getElementById('set-key').value;
+  var v = document.getElementById('set-val').value;
+  if (!k) { document.getElementById('set-msg').textContent = '❌ Key required'; return; }
+  apiPut('/api/settings', (function(){var o={};o[k]=v;return o;})()).then(function(r){
+    document.getElementById('set-msg').textContent = r.ok ? '✅ Saved' : '❌ '+(r.detail||'Failed');
+    if (r.ok) loadAll();
+  });
+}
+
+// ─── Modal ────────────────────────────────────────────────────────────────────
+function showModal(html) {
+  closeModal();
+  var div = document.createElement('div');
+  div.className = 'modal-overlay';
+  div.id = 'modal';
+  div.innerHTML = '<div class="modal">'+html+'</div>';
+  div.addEventListener('click', function(e){ if(e.target===div) closeModal(); });
+  document.body.appendChild(div);
+}
+function closeModal() { var m = document.getElementById('modal'); if (m) m.remove(); }
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
 loadAll();
 </script>
 </body>
