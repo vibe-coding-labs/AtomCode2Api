@@ -31,6 +31,8 @@ func NewServer(client *atmc.Client, s *store.Store) *Server {
 func (s *Server) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/v1/chat/completions", s.handleChat)
 	mux.HandleFunc("/v1/models", s.handleModels)
+	mux.HandleFunc("/v1/web-search", s.handleWebSearch)
+	mux.HandleFunc("/v1/rerank", s.handleRerank)
 	mux.HandleFunc("/health", s.handleHealth)
 	mux.HandleFunc("/v1/health", s.handleHealth)
 }

@@ -1,119 +1,236 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="zh-CN">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>AtomCode Proxy</title>
 <style>
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f5f5f5; color:#333; }
-header { background:#1a1a2e; color:#fff; padding:16px 24px; }
+body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; background:#f0f2f5; color:#333; }
+header { background:#1a1a2e; color:#fff; padding:14px 24px; display:flex; align-items:center; justify-content:space-between; }
 header h1 { font-size:20px; }
-nav { display:flex; gap:8px; padding:8px 24px; background:#fff; border-bottom:1px solid #e0e0e0; }
-nav a { padding:6px 16px; text-decoration:none; color:#666; border-radius:4px; }
-nav a.active { color:#1a1a2e; font-weight:600; }
-.content { padding:24px; max-width:1200px; margin:0 auto; }
-.card { background:#fff; border-radius:8px; padding:20px; margin-bottom:16px; box-shadow:0 1px 3px rgba(0,0,0,.1); }
-.card h3 { font-size:14px; color:#888; margin-bottom:8px; }
-.stat-value { font-size:32px; font-weight:700; color:#1a1a2e; }
-.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; }
-table { width:100%; border-collapse:collapse; }
-th,td { text-align:left; padding:8px 12px; border-bottom:1px solid #eee; }
-th { color:#888; font-weight:600; font-size:12px; text-transform:uppercase; }
-.badge { display:inline-block; padding:2px 8px; border-radius:12px; font-size:11px; font-weight:600; }
+header .version { font-size:12px; color:#889; }
+nav { display:flex; gap:4px; padding:8px 24px; background:#fff; border-bottom:1px solid #e8e8e8; }
+nav a { padding:6px 14px; text-decoration:none; color:#666; border-radius:6px; font-size:14px; cursor:pointer; }
+nav a:hover { background:#f5f5f5; }
+nav a.active { color:#1a1a2e; background:#e8e8ff; font-weight:600; }
+.content { padding:20px 24px; max-width:1200px; margin:0 auto; }
+.card { background:#fff; border-radius:8px; padding:20px; margin-bottom:16px; box-shadow:0 1px 2px rgba(0,0,0,.08); }
+.card h3 { font-size:13px; color:#888; margin-bottom:4px; text-transform:uppercase; letter-spacing:.5px; }
+.stat-value { font-size:28px; font-weight:700; color:#1a1a2e; }
+.grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:12px; }
+table { width:100%; border-collapse:collapse; font-size:13px; }
+th,td { text-align:left; padding:8px 10px; border-bottom:1px solid #f0f0f0; }
+th { color:#888; font-weight:600; font-size:11px; text-transform:uppercase; }
+.badge { display:inline-block; padding:2px 8px; border-radius:10px; font-size:11px; font-weight:600; }
 .badge.ok { background:#e6f7e6; color:#2e7d32; }
 .badge.err { background:#fde8e8; color:#c62828; }
-pre { background:#f5f5f5; padding:12px; border-radius:4px; overflow-x:auto; font-size:13px; }
+.badge.warn { background:#fff3e0; color:#e65100; }
+button { padding:8px 20px; border:none; border-radius:6px; cursor:pointer; font-size:14px; }
+.btn-primary { background:#1a1a2e; color:#fff; }
+.btn-primary:hover { background:#2a2a4e; }
+.btn-danger { background:#d32f2f; color:#fff; }
+input[type="text"],input[type="password"],select { padding:8px 12px; border:1px solid #ddd; border-radius:6px; font-size:14px; width:100%; }
+label { display:block; margin-bottom:4px; font-size:13px; color:#555; }
+.mb-2 { margin-bottom:12px; }
+.mr-2 { margin-right:8px; }
+.flex { display:flex; align-items:center; gap:8px; }
+.mt-2 { margin-top:12px; }
+.text-center { text-align:center; }
+pre { background:#f8f8f8; padding:12px; border-radius:4px; overflow-x:auto; font-size:12px; }
 </style>
 </head>
 <body>
-<header><h1>🔌 AtomCode Proxy</h1></header>
-<nav>
-<a href="#dashboard" class="active" onclick="showTab('dashboard')">Dashboard</a>
-<a href="#accounts" onclick="showTab('accounts')">Accounts</a>
-<a href="#logs" onclick="showTab('logs')">Request Logs</a>
-<a href="#settings" onclick="showTab('settings')">Settings</a>
-</nav>
-<div class="content" id="app"></div>
+<div id="root"></div>
 <script>
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
+// ─── State & Router ─────────────────────────────────────────────────────────
+let state = { stats:null, accounts:[], logs:[], settings:{}, auth:{initialized:false}, token: localStorage.getItem('token'), models:[] };
+let currentTab = window.location.hash.slice(1) || 'dashboard';
 
-let state = { stats: null, accounts: [], logs: [], settings: {} };
+window.addEventListener('hashchange', () => { currentTab = window.location.hash.slice(1) || 'dashboard'; render(); });
+
+function api(method, path, body) {
+  var opts = {method:method, headers:{'Content-Type':'application/json'}};
+  if (state.token) opts.headers['Authorization'] = 'Bearer ' + state.token;
+  if (body) opts.body = JSON.stringify(body);
+  return fetch(path, opts).then(r => r.json());
+}
+function apiGet(path) { return api('GET', path); }
+function apiPost(path, body) { return api('POST', path, body); }
+function apiPut(path, body) { return api('PUT', path, body); }
+function apiDel(path) { return api('DELETE', path); }
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 
 function showTab(name) {
-  document.querySelectorAll('nav a').forEach(a => a.classList.remove('active'));
-  document.querySelector('nav a[href="#' + name + '"]')?.classList.add('active');
-  render(name);
+  currentTab = name;
+  window.location.hash = name;
+  render();
 }
 
-async function api(path) {
-  const r = await fetch(path);
-  return r.json();
-}
-
+// ─── App ─────────────────────────────────────────────────────────────────────
 async function loadAll() {
-  try { state.stats = await api('/api/stats'); } catch(e) {}
-  try { state.accounts = await api('/api/accounts'); } catch(e) {}
-  try { state.logs = await api('/api/logs'); } catch(e) {}
-  try { state.settings = await api('/api/settings'); } catch(e) {}
-  render('dashboard');
+  try { state.stats = await apiGet('/api/stats'); } catch(e) {}
+  try { var a = await apiGet('/api/accounts'); state.accounts = a.accounts || []; } catch(e) {}
+  try { var s = await apiGet('/api/settings'); state.settings = s.settings || {}; } catch(e) {}
+  try { state.auth = await apiGet('/api/auth/status'); } catch(e) {}
+  try { state.modelsRes = await apiGet('/api/models'); state.models = state.modelsRes.models || []; } catch(e) {}
+  render();
 }
 
-function render(tab) {
-  var app = document.getElementById('app');
-  if (tab === 'dashboard') renderDashboard(app);
-  else if (tab === 'accounts') renderAccounts(app);
-  else if (tab === 'logs') renderLogs(app);
-  else if (tab === 'settings') renderSettings(app);
-  else renderDashboard(app);
+function render() {
+  var app = document.getElementById('root');
+  if (!state.auth.initialized && !state.token) { renderLogin(app); return; }
+  app.innerHTML = '<header><h1>🔌 AtomCode Proxy <span class="version">v0.1.0</span></h1><div><span id="header-info"></span></div></header>' +
+    '<nav>' +
+      '<a class="' + (currentTab==='dashboard'?'active':'') + '" onclick="showTab(\'dashboard\')">📊 Dashboard</a>' +
+      '<a class="' + (currentTab==='accounts'?'active':'') + '" onclick="showTab(\'accounts\')">👤 Accounts</a>' +
+      '<a class="' + (currentTab==='logs'?'active':'') + '" onclick="showTab(\'logs\')">📋 Request Logs</a>' +
+      '<a class="' + (currentTab==='settings'?'active':'') + '" onclick="showTab(\'settings\')">⚙️ Settings</a>' +
+    '</nav><div class="content" id="app-content"></div>';
+  var info = document.getElementById('header-info');
+  info.textContent = state.accounts.length + ' accounts';
+  renderContent();
 }
 
+function renderContent() {
+  var el = document.getElementById('app-content');
+  if (!el) return;
+  if (currentTab === 'dashboard') renderDashboard(el);
+  else if (currentTab === 'accounts') renderAccounts(el);
+  else if (currentTab === 'logs') renderLogs(el);
+  else if (currentTab === 'settings') renderSettings(el);
+  else if (currentTab === 'login') renderLoginContent(el);
+  else renderDashboard(el);
+}
+
+// ─── Login ──────────────────────────────────────────────────────────────────
+function renderLogin(app) {
+  app.innerHTML = '<div style="max-width:400px;margin:100px auto;text-align:center">' +
+    '<h1 style="margin-bottom:24px">🔌 AtomCode Proxy</h1>' +
+    '<div class="card" id="login-card">' +
+      (state.auth.initialized ? '' : '<p>首次使用，请设置管理员密码</p>') +
+      '<div class="mb-2"><label>Password</label><input type="password" id="login-pwd" placeholder="Enter password" /></div>' +
+      (state.auth.initialized ? '' : '<div class="mb-2"><label>Confirm</label><input type="password" id="login-pwd2" placeholder="Confirm password" /></div>') +
+      '<button class="btn-primary" onclick="doLogin()">' + (state.auth.initialized ? 'Login' : 'Setup') + '</button>' +
+      '<p id="login-err" style="color:red;margin-top:8px"></p>' +
+    '</div></div>';
+}
+function doLogin() {
+  var pwd = document.getElementById('login-pwd').value;
+  if (state.auth.initialized) {
+    apiPost('/api/auth/login', {password:pwd}).then(r => {
+      if (r.ok) { state.token = r.token; localStorage.setItem('token', r.token); render(); }
+      else { document.getElementById('login-err').textContent = r.detail || 'Login failed'; }
+    });
+  } else {
+    var pwd2 = document.getElementById('login-pwd2').value;
+    if (pwd !== pwd2) { document.getElementById('login-err').textContent = 'Passwords do not match'; return; }
+    apiPost('/api/auth/setup', {password:pwd}).then(r => {
+      if (r.ok) { state.token = r.token; localStorage.setItem('token', r.token); state.auth.initialized = true; render(); }
+      else { document.getElementById('login-err').textContent = r.detail || 'Setup failed'; }
+    });
+  }
+}
+
+// ─── Dashboard ──────────────────────────────────────────────────────────────
 function renderDashboard(el) {
   var s = state.stats || {};
   el.innerHTML =
     '<div class="grid">' +
-      '<div class="card"><h3>Today Requests</h3><div class="stat-value">' + (s.total_requests || 0) + '</div></div>' +
-      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">' + (s.total_input_tokens || 0) + '</div></div>' +
-      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">' + (s.total_output_tokens || 0) + '</div></div>' +
-      '<div class="card"><h3>Accounts</h3><div class="stat-value">' + (s.accounts_count || 0) + '</div></div>' +
+      '<div class="card"><h3>Today Requests</h3><div class="stat-value">' + (s.total_requests||0) + '</div></div>' +
+      '<div class="card"><h3>Input Tokens</h3><div class="stat-value">' + (s.total_input_tokens||0) + '</div></div>' +
+      '<div class="card"><h3>Output Tokens</h3><div class="stat-value">' + (s.total_output_tokens||0) + '</div></div>' +
+      '<div class="card"><h3>Accounts</h3><div class="stat-value">' + (s.accounts_count||0) + '</div></div>' +
     '</div>' +
     '<div class="card"><h3>Requests by Model</h3><table>' +
-      (s.by_model || []).map(function(m) { return '<tr><td>' + esc(m.model) + '</td><td>' + esc(m.count) + '</td></tr>'; }).join('') +
+      (s.by_model||[]).map(function(m){return '<tr><td>'+esc(m.model)+'</td><td>'+m.count+'</td></tr>';}).join('') +
     '</table></div>' +
-    '<div class="card"><h3>Status</h3><div id="health-status">Loading...</div></div>';
-  api('/health').then(function(r) {
-    document.getElementById('health-status').innerHTML =
-      '<span class="badge ' + (r.status === 'ok' ? 'ok' : 'err') + '">' + esc(r.status) + '</span> Daemon: ' + (r.daemon && r.daemon.connected ? '✅' : '❌');
-  });
+    '<div class="card"><h3>24h Hourly Breakdown</h3><div id="hourly-chart">' +
+      (s.hourly||[]).map(function(h){return '<span title="'+esc(h.hour)+': '+h.count+' reqs" style="display:inline-block;width:12px;margin:1px;height:'+Math.max(3,((h.count||0)/20)*40)+'px;background:#1a1a2e;border-radius:2px"></span>';}).join('') +
+    '</div></div>';
 }
 
+// ─── Accounts ───────────────────────────────────────────────────────────────
 function renderAccounts(el) {
   var accts = state.accounts || [];
   el.innerHTML =
-    '<div class="card"><h3>Accounts (' + accts.length + ')</h3><table><tr><th>User</th><th>Model</th><th>Created</th></tr>' +
-    accts.map(function(a) { return '<tr><td>' + esc(a.nickname || a.user_id) + '</td><td>' + esc(a.default_model || '-') + '</td><td>' + esc(a.created_at || '-') + '</td></tr>'; }).join('') +
-    '</table></div>';
+    '<div class="card">' +
+      '<div class="flex" style="justify-content:space-between"><h3>Accounts (' + accts.length + '/10)</h3>' +
+        '<div><button class="btn-primary mr-2" onclick="showAddAccount()">+ Add Account</button>' +
+        '<button onclick="showDeleteAll()" class="btn-danger">Clear All</button></div>' +
+      '</div>' +
+      '<table><tr><th>User</th><th>API Token</th><th>Model</th><th>Req(24h)</th><th>Valid</th><th>Actions</th></tr>' +
+      accts.map(function(a){
+        return '<tr><td>' + esc(a.nickname||a.user_id) + '</td>' +
+          '<td><code style="font-size:11px">' + esc(a.api_token).slice(0,16) + '...</code></td>' +
+          '<td>' + esc(a.default_model||'-') + '</td>' +
+          '<td>' + (a.today_requests||0) + '</td>' +
+          '<td><span class="badge ' + (a.credential_valid===1?'ok':a.credential_valid===0?'err':'warn') + '">' +
+            (a.credential_valid===1?'Valid':a.credential_valid===0?'Expired':'Unknown') + '</span></td>' +
+          '<td><button onclick="deleteAccount(\''+esc(a.user_id)+'\')" class="btn-danger" style="font-size:12px;padding:4px 10px">Delete</button></td></tr>';
+      }).join('') +
+      '</table></div>';
 }
+function showAddAccount() {
+  document.getElementById('app-content').innerHTML +=
+    '<div id="add-modal" style="position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;z-index:1000">' +
+    '<div class="card" style="width:400px"><h3>Add Account</h3>' +
+    '<div class="mb-2"><label>User ID</label><input type="text" id="add-userid" /></div>' +
+    '<div class="mb-2"><label>API Key / PtKey</label><input type="text" id="add-ptkey" /></div>' +
+    '<div class="mb-2"><label>Nickname</label><input type="text" id="add-nickname" /></div>' +
+    '<div><button class="btn-primary mr-2" onclick="submitAddAccount()">Save</button>' +
+    '<button onclick="closeModal()">Cancel</button></div></div></div>';
+}
+function submitAddAccount() {
+  apiPost('/api/accounts', {
+    user_id: document.getElementById('add-userid').value,
+    pt_key: document.getElementById('add-ptkey').value,
+    nickname: document.getElementById('add-nickname').value
+  }).then(function(r) {
+    if (r.ok) { closeModal(); loadAll(); }
+    else { alert(r.detail || 'Failed'); }
+  });
+}
+function closeModal() { var m = document.getElementById('add-modal'); if(m) m.remove(); }
+function deleteAccount(id) { if(!confirm('Delete account '+id+'?')) return; apiDel('/api/accounts/'+id).then(function(){loadAll();}); }
+function showDeleteAll() { if(!confirm('Delete ALL accounts?')) return; apiPost('/api/accounts-clear-all').then(function(){loadAll();}); }
 
+// ─── Logs ───────────────────────────────────────────────────────────────────
 function renderLogs(el) {
   var logs = state.logs || [];
   el.innerHTML =
-    '<div class="card"><h3>Recent Requests (' + logs.length + ')</h3><table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
-    logs.map(function(l) { return '<tr><td>' + esc(l.model || '-') + '</td><td>' + esc(l.endpoint) + '</td><td><span class="badge ' + (l.status_code < 400 ? 'ok' : 'err') + '">' + esc(l.status_code) + '</span></td><td>' + (l.latency_ms || 0) + 'ms</td><td>' + esc(l.created_at || '') + '</td></tr>'; }).join('') +
-    '</table></div>';
+    '<div class="card"><h3>Recent Requests (' + logs.length + ')</h3>' +
+    '<table><tr><th>Model</th><th>Endpoint</th><th>Status</th><th>Latency</th><th>Time</th></tr>' +
+    logs.map(function(l){
+      return '<tr><td>' + esc(l.model||'-') + '</td><td>' + esc(l.endpoint) + '</td>' +
+        '<td><span class="badge ' + (l.status_code<400?'ok':'err') + '">' + l.status_code + '</span></td>' +
+        '<td>' + l.latency_ms + 'ms</td><td>' + esc(l.created_at||'') + '</td></tr>';
+    }).join('') + '</table></div>';
 }
 
+// ─── Settings ───────────────────────────────────────────────────────────────
 function renderSettings(el) {
   var s = state.settings || {};
-  var rows = '';
-  for (var k in s) {
-    rows += '<tr><td>' + esc(k) + '</td><td>' + esc(s[k]) + '</td></tr>';
-  }
-  el.innerHTML = '<div class="card"><h3>Settings</h3><table><tr><th>Key</th><th>Value</th></tr>' + rows + '</table></div>';
+  el.innerHTML =
+    '<div class="card"><h3>Settings</h3><table><tr><th>Key</th><th>Value</th></tr>' +
+    Object.keys(s).map(function(k){return '<tr><td>'+esc(k)+'</td><td>'+esc(s[k])+'</td></tr>';}).join('') +
+    '</table></div>' +
+    '<div class="card"><h3>Change Password</h3>' +
+    '<div class="mb-2"><label>Current password</label><input type="password" id="chg-old" /></div>' +
+    '<div class="mb-2"><label>New password</label><input type="password" id="chg-new" /></div>' +
+    '<button class="btn-primary" onclick="changePassword()">Change</button><p id="chg-msg" style="margin-top:8px"></p></div>';
+}
+function changePassword() {
+  apiPost('/api/auth/change-password', {
+    old_password: document.getElementById('chg-old').value,
+    new_password: document.getElementById('chg-new').value
+  }).then(function(r) {
+    document.getElementById('chg-msg').textContent = r.ok ? '✅ Password changed' : '❌ ' + (r.detail||'Failed');
+  });
 }
 
+// ─── Init ───────────────────────────────────────────────────────────────────
 loadAll();
 </script>
 </body>

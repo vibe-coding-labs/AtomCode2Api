@@ -76,12 +76,13 @@ func runServe() error {
 
 	srv := openai.NewServer(client, s)
 	anth := anthropic.NewHandler(client, s)
-	dash := dashboard.NewHandler(s)
+	dash := dashboard.NewHandler(s, nil, nil)
 
 	mux := http.NewServeMux()
 	srv.RegisterRoutes(mux)
 	anth.RegisterRoutes(mux)
 	dash.RegisterRoutes(mux)
+	mux.HandleFunc("/", dash.ServeStatic)
 
 	handler := requestLogMiddleware(mux, s)
 	if verbose {
