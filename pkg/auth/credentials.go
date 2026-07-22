@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 )
 
-const credsDir = ".atomcode-proxy"
+const credsDir = ".atomcode-2api"
 
 // Credentials represents daemon authentication credentials.
 type Credentials struct {

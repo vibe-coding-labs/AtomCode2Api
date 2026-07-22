@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
 )
 
 // TranslateToOpenAIResponse converts daemon SSE events into a non-streaming ChatCompletionResponse.

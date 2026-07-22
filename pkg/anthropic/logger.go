@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/store"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/store"
 )
 
 // LoggerMiddleware wraps a handler with Anthropic-specific request logging.

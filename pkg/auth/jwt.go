@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	storeDir = ".atomcode-proxy"
+	storeDir = ".atomcode-2api"
 	keyFile  = ".auth_key"
 )
 
@@ -107,7 +107,7 @@ func NewJWTManager(secret string) *JWTManager {
 	}
 	return &JWTManager{
 		secret:   []byte(secret),
-		issuer:   "atomcode-proxy",
+		issuer:   "atomcode-2api",
 		duration: 24 * time.Hour,
 	}
 }

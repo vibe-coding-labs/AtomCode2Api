@@ -1,4 +1,4 @@
-module github.com/vibe-coding-labs/AtomCodeProxy
+module github.com/vibe-coding-labs/AtomCode2API
 
 go 1.25.0
 

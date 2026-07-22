@@ -4,7 +4,7 @@ import "runtime"
 
 // ServiceName returns the human-readable service name.
 func ServiceName() string {
-	return "atomcode-proxy"
+	return "atomcode-2api"
 }
 
 // SupportsSystemd returns true if the platform supports systemd.

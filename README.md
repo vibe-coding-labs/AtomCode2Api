@@ -1,4 +1,4 @@
-# AtomCodeProxy
+# AtomCode2API
 
 **A reverse proxy that translates AtomCode Daemon's private API into standard OpenAI/Anthropic APIs. Turn your free CodingPlan quota into a universal AI endpoint.**
 
@@ -8,7 +8,7 @@
 
 ## English
 
-> AtomCodeProxy is an engineering implementation based on reverse-engineered analysis of the [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) daemon protocol. It acts as a protocol translation layer between your favorite AI tools (Claude Code, Cursor, Cline) and the AtomCode local daemon, exposing its CodingPlan free-tier AI quota through standard OpenAI and Anthropic-compatible APIs.
+> AtomCode2API is an engineering implementation based on reverse-engineered analysis of the [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) daemon protocol. It acts as a protocol translation layer between your favorite AI tools (Claude Code, Cursor, Cline) and the AtomCode local daemon, exposing its CodingPlan free-tier AI quota through standard OpenAI and Anthropic-compatible APIs.
 
 ### Problem
 
@@ -18,7 +18,7 @@ AtomCode (a Chinese AI coding assistant) provides a **CodingPlan Lite** free tie
 
 However, AtomCode uses its own private daemon protocol (`localhost:13456`). Mainstream AI coding tools like **Claude Code**, **Cursor**, and **Cline** only support standard OpenAI Chat Completions or Anthropic Messages APIs — they cannot directly connect to AtomCode.
 
-**AtomCodeProxy solves this** by sitting between your tools and the daemon, translating requests and responses in real-time.
+**AtomCode2API solves this** by sitting between your tools and the daemon, translating requests and responses in real-time.
 
 ### Architecture
 
@@ -26,7 +26,7 @@ However, AtomCode uses its own private daemon protocol (`localhost:13456`). Main
 Your AI Tool (Claude Code / Cursor / Cline)
   │ POST /v1/chat/completions (OpenAI) or POST /v1/messages (Anthropic)
   ▼
-AtomCodeProxy (:13457) ─── protocol translation layer
+AtomCode2API (:13457) ─── protocol translation layer
   │ POST /chat (SSE stream)
   ▼
 AtomCode Daemon (:13456) ─── private daemon protocol
@@ -58,10 +58,10 @@ AI Models (deepseek-v4-flash, etc.)
 atomcode daemon
 
 # 2. First time: login & claim CodingPlan
-atomcode-proxy setup
+atomcode-2api setup
 
 # 3. Start the proxy
-atomcode-proxy serve
+atomcode-2api serve
 
 # 4. Configure Claude Code
 export ANTHROPIC_BASE_URL=http://localhost:13457
@@ -73,16 +73,16 @@ claude
 
 ```bash
 # Start as background daemon (auto-restart on crash)
-atomcode-proxy daemon start
+atomcode-2api daemon start
 
 # Check status
-atomcode-proxy daemon status
+atomcode-2api daemon status
 
 # View logs (last N lines)
-atomcode-proxy daemon logs
+atomcode-2api daemon logs
 
 # Stop
-atomcode-proxy daemon stop
+atomcode-2api daemon stop
 ```
 
 ### API Endpoints
@@ -97,27 +97,27 @@ atomcode-proxy daemon stop
 ### CLI Commands
 
 ```
-atomcode-proxy serve         Start proxy server
-atomcode-proxy setup         Login + CodingPlan claim
-atomcode-proxy login         OAuth login only
-atomcode-proxy daemon        Background service management
-atomcode-proxy models        List available models
-atomcode-proxy status        Show daemon/proxy status
-atomcode-proxy whoami        Show current logged-in user
-atomcode-proxy check         Full health check
-atomcode-proxy config show   Show configuration
+atomcode-2api serve         Start proxy server
+atomcode-2api setup         Login + CodingPlan claim
+atomcode-2api login         OAuth login only
+atomcode-2api daemon        Background service management
+atomcode-2api models        List available models
+atomcode-2api status        Show daemon/proxy status
+atomcode-2api whoami        Show current logged-in user
+atomcode-2api check         Full health check
+atomcode-2api config show   Show configuration
 ```
 
 ### Build
 
 ```bash
-go build -o atomcode-proxy ./cmd/atomcode-proxy/
+go build -o atomcode-2api ./cmd/atomcode-2api/
 ```
 
 ### Project Structure
 
 ```
-cmd/atomcode-proxy/    CLI entry (cobra commands)
+cmd/atomcode-2api/    CLI entry (cobra commands)
 pkg/atmc/              AtomCode daemon HTTP client + SSE translator
 pkg/openai/            OpenAI protocol handler
 pkg/anthropic/         Anthropic protocol handler
@@ -137,7 +137,7 @@ Apache 2.0
 
 ## 简体中文
 
-> AtomCodeProxy 是基于 [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) Daemon 协议逆向分析的工程化实现。它在你的 AI 工具和 AtomCode 本地 daemon 之间充当协议翻译层，将 AtomCode 的 CodingPlan 免费 AI 额度通过标准的 OpenAI 和 Anthropic 兼容 API 暴露出来。
+> AtomCode2API 是基于 [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) Daemon 协议逆向分析的工程化实现。它在你的 AI 工具和 AtomCode 本地 daemon 之间充当协议翻译层，将 AtomCode 的 CodingPlan 免费 AI 额度通过标准的 OpenAI 和 Anthropic 兼容 API 暴露出来。
 
 ### 问题
 
@@ -147,7 +147,7 @@ AtomCode（一个国产 AI 编程助手）提供了 **CodingPlan Lite** 免费�
 
 然而 AtomCode 使用的是自己的私有 daemon 协议（`localhost:13456`）。主流的 AI 编程工具如 **Claude Code**、**Cursor**、**Cline** 只支持标准的 OpenAI Chat Completions 或 Anthropic Messages API — 它们无法直连 AtomCode。
 
-**AtomCodeProxy 解决了这个问题**：它充当工具和 daemon 之间的翻译层，实时转换请求和响应。
+**AtomCode2API 解决了这个问题**：它充当工具和 daemon 之间的翻译层，实时转换请求和响应。
 
 ### 架构
 
@@ -155,7 +155,7 @@ AtomCode（一个国产 AI 编程助手）提供了 **CodingPlan Lite** 免费�
 AI 工具 (Claude Code / Cursor / Cline)
   │ POST /v1/chat/completions (OpenAI) 或 POST /v1/messages (Anthropic)
   ▼
-AtomCodeProxy (:13457) ─── 协议翻译层
+AtomCode2API (:13457) ─── 协议翻译层
   │ POST /chat (SSE 流)
   ▼
 AtomCode Daemon (:13456) ─── 私有 daemon 协议
@@ -187,10 +187,10 @@ AI 模型 (deepseek-v4-flash 等)
 atomcode daemon
 
 # 2. 首次使用：登录 + 领取 CodingPlan
-atomcode-proxy setup
+atomcode-2api setup
 
 # 3. 启动代理
-atomcode-proxy serve
+atomcode-2api serve
 
 # 4. 配置 Claude Code
 export ANTHROPIC_BASE_URL=http://localhost:13457
@@ -208,20 +208,20 @@ claude
 ### CLI 命令
 
 ```
-atomcode-proxy serve         启动代理服务器
-atomcode-proxy setup         登录 + 领取 CodingPlan
-atomcode-proxy daemon        守护进程管理
-atomcode-proxy models        列出可用模型
-atomcode-proxy status        查看状态
-atomcode-proxy check         全面健康检查
-atomcode-proxy whoami        当前用户信息
-atomcode-proxy config show   查看配置
+atomcode-2api serve         启动代理服务器
+atomcode-2api setup         登录 + 领取 CodingPlan
+atomcode-2api daemon        守护进程管理
+atomcode-2api models        列出可用模型
+atomcode-2api status        查看状态
+atomcode-2api check         全面健康检查
+atomcode-2api whoami        当前用户信息
+atomcode-2api config show   查看配置
 ```
 
 ### 项目结构
 
 ```
-cmd/atomcode-proxy/    CLI 入口（cobra 命令）
+cmd/atomcode-2api/    CLI 入口（cobra 命令）
 pkg/atmc/              AtomCode daemon HTTP 客户端 + SSE 翻译器
 pkg/openai/            OpenAI 协议层
 pkg/anthropic/         Anthropic 协议层

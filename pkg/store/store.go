@@ -20,7 +20,7 @@ import (
 )
 
 const (
-	DefaultDBDir  = ".atomcode-proxy"
+	DefaultDBDir  = ".atomcode-2api"
 	DefaultDBName = "proxy.db"
 	encKeyFile    = ".enc_key"
 	MaxAccounts   = 10
@@ -54,6 +54,8 @@ type AccountInfo struct {
 	APIToken        string `json:"api_token"`
 	IsDefault       bool   `json:"is_default"`
 	DefaultModel    string `json:"default_model"`
+	DisplayOrder    int    `json:"display_order"`
+	ActiveSessions  int64  `json:"active_sessions"`
 	CreatedAt       string `json:"created_at,omitempty"`
 	TotalRequests   int    `json:"total_requests"`
 	TodayRequests   int    `json:"today_requests"`
@@ -161,6 +163,7 @@ type ExportAccountItem struct {
 	PtKey        string `json:"pt_key"`
 	IsDefault    bool   `json:"is_default"`
 	DefaultModel string `json:"default_model"`
+	DisplayOrder int    `json:"display_order"`
 }
 
 type Store struct {
@@ -243,7 +246,8 @@ func (s *Store) migrate() error {
 			created_at TEXT DEFAULT (datetime('now', 'localtime')),
 			updated_at TEXT DEFAULT (datetime('now', 'localtime')),
 			credential_refreshed_at TEXT DEFAULT '',
-			credential_valid INTEGER DEFAULT -1
+			credential_valid INTEGER DEFAULT -1,
+			display_order INTEGER DEFAULT 0
 		);
 		CREATE TABLE IF NOT EXISTS settings (
 			key TEXT PRIMARY KEY,
@@ -264,7 +268,13 @@ func (s *Store) migrate() error {
 			created_at TEXT DEFAULT (datetime('now', 'localtime'))
 		);
 	`)
-	return err
+	if err != nil {
+		return err
+	}
+	// Migration for existing databases that lack display_order
+	s.db.Exec("ALTER TABLE accounts ADD COLUMN display_order INTEGER DEFAULT 0")
+	s.migrateDisplayOrder()
+	return nil
 }
 
 func (s *Store) loadOrCreateEncKey(dir string) ([]byte, error) {
@@ -374,7 +384,7 @@ func (s *Store) AddAccount(userID, ptKey, nickname string, isDefault bool, defau
 }
 
 func (s *Store) ListAccounts() ([]AccountInfo, error) {
-	rows, err := s.db.Query("SELECT user_id, nickname, remark, api_token, is_default, default_model, created_at, credential_valid, credential_refreshed_at FROM accounts ORDER BY created_at")
+	rows, err := s.db.Query("SELECT user_id, nickname, remark, api_token, is_default, default_model, created_at, credential_valid, credential_refreshed_at, COALESCE(display_order, 0) FROM accounts ORDER BY display_order, created_at")
 	if err != nil {
 		return nil, err
 	}
@@ -384,7 +394,7 @@ func (s *Store) ListAccounts() ([]AccountInfo, error) {
 	for rows.Next() {
 		var a AccountInfo
 		var isDef int
-		if err := rows.Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &isDef, &a.DefaultModel, &a.CreatedAt, &a.CredentialValid, &a.CredentialCheckedAt); err != nil {
+		if err := rows.Scan(&a.UserID, &a.Nickname, &a.Remark, &a.APIToken, &isDef, &a.DefaultModel, &a.CreatedAt, &a.CredentialValid, &a.CredentialCheckedAt, &a.DisplayOrder); err != nil {
 			return nil, err
 		}
 		a.IsDefault = isDef == 1
@@ -655,13 +665,36 @@ func (s *Store) ListAllAccountsWithCredentials() ([]Account, error) {
 	return accounts, rows.Err()
 }
 
+func (s *Store) migrateDisplayOrder() {
+	count := 0
+	s.db.QueryRow("SELECT COUNT(*) FROM accounts WHERE display_order = 0").Scan(&count)
+	if count > 0 {
+		rows, err := s.db.Query("SELECT user_id FROM accounts ORDER BY created_at")
+		if err != nil {
+			slog.Error("store: migrateDisplayOrder query failed", "error", err)
+			return
+		}
+		defer rows.Close()
+		order := 1
+		for rows.Next() {
+			var uid string
+			if rows.Scan(&uid) == nil {
+				s.db.Exec("UPDATE accounts SET display_order = ? WHERE user_id = ?", order, uid)
+				order++
+			}
+		}
+		slog.Info("store: initialized display_order for existing accounts", "count", count)
+	}
+}
+
+
 // ─── Export / Import ─────────────────────────────────────────────────────────
 
 func (s *Store) ExportAccounts() ([]ExportAccountItem, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.Query("SELECT user_id, nickname, remark, pt_key, is_default, default_model FROM accounts ORDER BY created_at")
+	rows, err := s.db.Query("SELECT user_id, nickname, remark, pt_key, is_default, default_model, COALESCE(display_order, 0) FROM accounts ORDER BY display_order, created_at")
 	if err != nil {
 		return nil, fmt.Errorf("query: %w", err)
 	}
@@ -672,7 +705,7 @@ func (s *Store) ExportAccounts() ([]ExportAccountItem, error) {
 		var item ExportAccountItem
 		var encPtKey string
 		var isDef int
-		if err := rows.Scan(&item.UserID, &item.Nickname, &item.Remark, &encPtKey, &isDef, &item.DefaultModel); err != nil {
+		if err := rows.Scan(&item.UserID, &item.Nickname, &item.Remark, &encPtKey, &isDef, &item.DefaultModel, &item.DisplayOrder); err != nil {
 			return nil, err
 		}
 		ptKey, err := s.decrypt(encPtKey)
@@ -1026,6 +1059,64 @@ func (s *Store) GetRecentErrors(limit int) ([]RequestLog, error) {
 	}
 	return logs, nil
 }
+
+// ─── Quota / Rate Limit ────────────────────────────────────────────────────
+
+// GetDailyRequestCount returns the number of requests made today by a given api_key.
+func (s *Store) GetDailyRequestCount(apiKey string) (int, error) {
+	var count int
+	err := s.db.QueryRow(
+		"SELECT COUNT(*) FROM request_logs WHERE api_key = ? AND date(created_at, 'localtime') = date('now', 'localtime')",
+		apiKey,
+	).Scan(&count)
+	return count, err
+}
+
+// GetGlobalDailyRequestCount returns total requests today across all accounts.
+func (s *Store) GetGlobalDailyRequestCount() (int, error) {
+	var count int
+	err := s.db.QueryRow(
+		"SELECT COUNT(*) FROM request_logs WHERE date(created_at, 'localtime') = date('now', 'localtime')",
+	).Scan(&count)
+	return count, err
+}
+
+// GetDailyQuota returns the configured daily request limit from settings.
+// Returns 0 if unlimited.
+func (s *Store) GetDailyQuota() int {
+	return s.GetIntSetting("daily_request_limit", 0)
+}
+
+// GetAccountDailyQuota returns the per-account daily request limit.
+// Returns 0 if unlimited.
+func (s *Store) GetAccountDailyQuota() int {
+	return s.GetIntSetting("account_daily_limit", 0)
+}
+
+// CheckQuota returns true if the request is allowed (no quota exceeded).
+// Returns false and a message if quota is exceeded.
+func (s *Store) CheckQuota(apiKey string) (allowed bool, msg string) {
+	// Global quota check
+	globalLimit := s.GetDailyQuota()
+	if globalLimit > 0 {
+		count, _ := s.GetGlobalDailyRequestCount()
+		if count >= globalLimit {
+			return false, fmt.Sprintf("global daily quota exceeded (%d/%d)", count, globalLimit)
+		}
+	}
+
+	// Per-account quota check
+	accountLimit := s.GetAccountDailyQuota()
+	if accountLimit > 0 && apiKey != "" {
+		count, _ := s.GetDailyRequestCount(apiKey)
+		if count >= accountLimit {
+			return false, fmt.Sprintf("account daily quota exceeded (%d/%d)", count, accountLimit)
+		}
+	}
+
+	return true, ""
+}
+
 
 // ─── Data Dir ────────────────────────────────────────────────────────────────
 

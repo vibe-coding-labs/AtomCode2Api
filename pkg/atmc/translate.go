@@ -134,57 +134,24 @@ type AnthropicState struct {
 	MessageID    string
 	ContentIndex int
 	HasSentStart bool
+	CurrentBlock string // "text", "thinking", "tool_use"
 }
 
 func NewAnthropicState() *AnthropicState {
-	return &AnthropicState{MessageID: fmt.Sprintf("msg_%x", time.Now().UnixNano())}
+	return &AnthropicState{
+		MessageID: fmt.Sprintf("msg_%x", time.Now().UnixNano()),
+	}
 }
 
 // TranslateToAnthropicSSE converts a daemon SSEEvent to Anthropic SSE data lines.
 func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) []string {
 	switch ev.Type {
 	case "text":
-		if !state.HasSentStart {
-			state.HasSentStart = true
-			return []string{
-				fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
-					jsonString(state.MessageID), jsonString(model), jsonString(model)),
-				fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"text","text":""}}`, state.ContentIndex),
-				fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
-			}
-		}
-		return []string{
-			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
-		}
+		return translateAnthropicText(ev, model, state)
 	case "reasoning":
-		if !state.HasSentStart {
-			state.HasSentStart = true
-			return []string{
-				fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
-					jsonString(state.MessageID), jsonString(model), jsonString(model)),
-				fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"thinking","thinking":""}}`, state.ContentIndex),
-				fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
-			}
-		}
-		return []string{
-			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
-		}
+		return translateAnthropicReasoning(ev, model, state)
 	case "tool_start":
-		if !state.HasSentStart {
-			state.HasSentStart = true
-			state.ContentIndex = -1
-			return []string{
-				fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
-					jsonString(state.MessageID), jsonString(model), jsonString(model)),
-				fmt.Sprintf(`{"type":"content_block_start","index":0,"content_block":{"type":"tool_use","id":%s,"name":%s,"input":{}}}`, jsonString(ev.ID), jsonString(ev.Name)),
-				fmt.Sprintf(`{"type":"content_block_delta","index":0,"delta":{"type":"input_json_delta","partial_json":%s}}`, jsonString(ev.Arguments)),
-			}
-		}
-		state.ContentIndex++
-		return []string{
-			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"tool_use","id":%s,"name":%s,"input":{}}}`, state.ContentIndex, jsonString(ev.ID), jsonString(ev.Name)),
-			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"input_json_delta","partial_json":%s}}`, state.ContentIndex, jsonString(ev.Arguments)),
-		}
+		return translateAnthropicToolStart(ev, model, state)
 	case "tool_output", "tool_result":
 		return nil
 	case "tokens":
@@ -193,17 +160,115 @@ func TranslateToAnthropicSSE(ev *SSEEvent, model string, state *AnthropicState) 
 				ev.Completion, ev.Prompt, jsonString(state.MessageID)),
 		}
 	case "done", "stopped":
-		return []string{
-			`{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{}}`,
-			`{"type":"message_stop"}`,
+		var lines []string
+		if state.CurrentBlock != "" {
+			lines = append(lines, fmt.Sprintf(`{"type":"content_block_stop","index":%d}`, state.ContentIndex))
+			state.CurrentBlock = ""
 		}
+		lines = append(lines,
+			`{"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{}}`,
+			`{"type":"message_stop"}`)
+		return lines
 	case "error":
+		if state.CurrentBlock != "" {
+			state.CurrentBlock = ""
+		}
 		return []string{
 			fmt.Sprintf(`{"type":"error","error":{"type":"api_error","message":%s}}`, jsonString(ev.Message)),
 		}
 	default:
 		return nil
 	}
+}
+
+func translateAnthropicText(ev *SSEEvent, model string, state *AnthropicState) []string {
+	// If we are in a non-text block, close it first
+	if state.CurrentBlock != "" && state.CurrentBlock != "text" {
+		closeBlock := []string{
+			fmt.Sprintf(`{"type":"content_block_stop","index":%d}`, state.ContentIndex),
+		}
+		state.ContentIndex++
+		state.CurrentBlock = "text"
+		openBlock := []string{
+			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"text","text":""}}`, state.ContentIndex),
+			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+		}
+		return append(closeBlock, openBlock...)
+	}
+
+	if !state.HasSentStart {
+		state.HasSentStart = true
+		state.CurrentBlock = "text"
+		return []string{
+			fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
+				jsonString(state.MessageID), jsonString(model), jsonString(model)),
+			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"text","text":""}}`, state.ContentIndex),
+			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+		}
+	}
+	state.CurrentBlock = "text"
+	return []string{
+		fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"text_delta","text":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+	}
+}
+
+func translateAnthropicReasoning(ev *SSEEvent, model string, state *AnthropicState) []string {
+	// If we are in a non-thinking block, close it first
+	if state.CurrentBlock != "" && state.CurrentBlock != "thinking" {
+		closeBlock := []string{
+			fmt.Sprintf(`{"type":"content_block_stop","index":%d}`, state.ContentIndex),
+		}
+		state.ContentIndex++
+		state.CurrentBlock = "thinking"
+		openBlock := []string{
+			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"thinking","thinking":""}}`, state.ContentIndex),
+			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+		}
+		return append(closeBlock, openBlock...)
+	}
+
+	if !state.HasSentStart {
+		state.HasSentStart = true
+		state.CurrentBlock = "thinking"
+		return []string{
+			fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
+				jsonString(state.MessageID), jsonString(model), jsonString(model)),
+			fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"thinking","thinking":""}}`, state.ContentIndex),
+			fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+		}
+	}
+	state.CurrentBlock = "thinking"
+	return []string{
+		fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"thinking_delta","thinking":%s}}`, state.ContentIndex, jsonString(ev.Content)),
+	}
+}
+
+func translateAnthropicToolStart(ev *SSEEvent, model string, state *AnthropicState) []string {
+	var lines []string
+
+	// Close current block if any
+	if state.CurrentBlock != "" && state.CurrentBlock != "tool_use" {
+		lines = append(lines, fmt.Sprintf(`{"type":"content_block_stop","index":%d}`, state.ContentIndex))
+		state.ContentIndex++
+		state.HasSentStart = true
+	} else if !state.HasSentStart {
+		state.HasSentStart = true
+		state.ContentIndex = 0
+		lines = append(lines,
+			fmt.Sprintf(`{"type":"message_start","message":{"id":%s,"type":"message","role":"assistant","content":[],"model":%s,"stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}},"model":%s}`,
+				jsonString(state.MessageID), jsonString(model), jsonString(model)))
+	} else if state.CurrentBlock == "tool_use" {
+		// Already in a tool_use, close previous
+		lines = append(lines, fmt.Sprintf(`{"type":"content_block_stop","index":%d}`, state.ContentIndex))
+		state.ContentIndex++
+	}
+
+	state.CurrentBlock = "tool_use"
+	lines = append(lines,
+		fmt.Sprintf(`{"type":"content_block_start","index":%d,"content_block":{"type":"tool_use","id":%s,"name":%s,"input":{}}}`, state.ContentIndex, jsonString(ev.ID), jsonString(ev.Name)),
+		fmt.Sprintf(`{"type":"content_block_delta","index":%d,"delta":{"type":"input_json_delta","partial_json":%s}}`, state.ContentIndex, jsonString(ev.Arguments)),
+	)
+	return lines
 }
 
 func jsonString(s string) string {

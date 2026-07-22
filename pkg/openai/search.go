@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
 )
 
 func (s *Server) handleWebSearch(w http.ResponseWriter, r *http.Request) {

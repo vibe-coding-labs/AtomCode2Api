@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/store"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/store"
 )
 
 // Server implements the OpenAI-compatible HTTP API.
@@ -95,7 +95,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := map[string]any{
 		"status":   status,
-		"service":  "atomcode-proxy",
+		"service":  "atomcode-2api",
 		"daemon": map[string]any{
 			"connected": daemonOK,
 			"version":   daemonVersion,
@@ -256,16 +256,28 @@ func (s *Server) handleStreamChat(w http.ResponseWriter, r *http.Request, req *C
 	}
 
 	toolIdx := 0
+	hasToolUse := false
 	var lastSessionID string
 
 	for ev := range ch {
 		if ev.Type == "done" {
 			lastSessionID = ev.SessionID
+			// Send appropriate finish_reason chunk before [DONE]
+			finishReason := "stop"
+			if hasToolUse {
+				finishReason = "tool_calls"
+			}
+			finishChunk := fmt.Sprintf(`{"id":"chatcmpl-atomcode","object":"chat.completion.chunk","created":%d,"model":"%s","choices":[{"delta":{},"finish_reason":"%s","index":0}]}`, time.Now().Unix(), req.Model, finishReason)
+			fmt.Fprintf(w, "data: %s\n\n", finishChunk)
+			flusher.Flush()
 			fmt.Fprint(w, "data: [DONE]\n\n")
 			flusher.Flush()
 			break
 		}
 
+		if ev.Type == "tool_start" {
+			hasToolUse = true
+		}
 		delta := atmc.TranslateToOpenAIChunk(&ev, req.Model, &toolIdx)
 		if delta == "" {
 			continue

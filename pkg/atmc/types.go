@@ -95,6 +95,7 @@ type ProviderConfig struct {
 
 type CodingPlanSetupResponse struct {
 	Success         bool              `json:"success"`
+	ReportText      string            `json:"report_text,omitempty"`
 	DefaultProvider string            `json:"default_provider,omitempty"`
 	Providers       []ProviderConfig  `json:"providers,omitempty"`
 	Steps           map[string]any    `json:"steps,omitempty"`

@@ -1,8 +1,8 @@
-# AtomCodeProxy vs JoyCodeProxy — 功能对比（已对齐）
+# AtomCode2API vs JoyCodeProxy — 功能对比（已对齐）
 
 ## 状态总览
 
-| 类别 | JoyCode | AtomCodeProxy | 状态 |
+| 类别 | JoyCode | AtomCode2API | 状态 |
 |---|---|---|---|
 | CLI 命令 | 23 个文件 | 19 个文件 | ✅ ~90% |
 | pkg 模块 | 14 个 | 14 个 | ✅ 全部对齐 |
@@ -82,7 +82,7 @@
 ## 测试结果
 
 ```
-ok  cmd/atomcode-proxy     0.026s
+ok  cmd/atomcode-2api     0.026s
 ok  pkg/anthropic          0.009s
 ok  pkg/atmc               0.011s
 ok  pkg/auth               0.010s

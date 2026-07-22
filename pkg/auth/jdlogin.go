@@ -2,13 +2,9 @@ package auth
 
 import (
 	"crypto/hmac"
-	"crypto/rand"
-	"crypto/rsa"
 	"crypto/sha256"
-	"crypto/x509"
 	"encoding/base64"
 	"encoding/json"
-	"encoding/pem"
 	"fmt"
 	"io"
 	"net/http"
@@ -45,47 +41,9 @@ const (
 
 // QRInit creates a QR login session and returns the session ID and QR image base64.
 func QRInit() (string, string, error) {
-	// Generate RSA key pair for the QR challenge
-	key, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return "", "", fmt.Errorf("generate key: %w", err)
-	}
-	pubKeyBytes, err := x509.MarshalPKIXPublicKey(&key.PublicKey)
-	if err != nil {
-		return "", "", err
-	}
-	pubKeyPEM := pem.EncodeToMemory(&pem.Block{Type: "PUBLIC KEY", Bytes: pubKeyBytes})
-
-	// Request QR code from JD
-	body := fmt.Sprintf(`{"appId":"%s","pubKey":"%s"}`, appID, strings.ReplaceAll(string(pubKeyPEM), "\n", "\\n"))
-	resp, err := http.Post(jdhBaseURL+"/api/qr/QRCodeApply", "application/json", strings.NewReader(body))
-	if err != nil {
-		return "", "", fmt.Errorf("qr apply: %w", err)
-	}
-	defer resp.Body.Close()
-
-	data, _ := io.ReadAll(resp.Body)
-	var result struct {
-		Code int    `json:"code"`
-		Msg  string `json:"msg"`
-		Data struct {
-			SessionID string `json:"sessionId"`
-			QRImage   string `json:"qrImage"`
-		} `json:"data"`
-	}
-	if err := json.Unmarshal(data, &result); err != nil {
-		return "", "", fmt.Errorf("parse qr response: %w", err)
-	}
-	if result.Code != 0 {
-		return "", "", fmt.Errorf("qr api error (code=%d): %s", result.Code, result.Msg)
-	}
-
-	qrSessions[result.Data.SessionID] = &QRSession{
-		SessionID: result.Data.SessionID,
-		ExpiresAt: time.Now().Add(5 * time.Minute),
-	}
-
-	return result.Data.SessionID, result.Data.QRImage, nil
+	// JD QR API has been deprecated by JD. Return a clear error message
+	// directing users to use the daemon-based auto-login instead.
+	return "", "", fmt.Errorf("京东扫码登录接口已失效，请使用「一键登录」从本机 AtomCode 自动导入账号。如需手动登录，请运行: atomcode setup")
 }
 
 // QRPollStatus polls the QR login status.
@@ -136,15 +94,27 @@ func QRPollStatus(sessionID string) (string, *QRSession, error) {
 	}
 }
 
-// LoadFromSystem loads JoyCode credentials from the local system.
-// This is AtomCode-specific — reads from ~/.atomcode/ config.
+// LoadFromSystem loads AtomCode daemon credentials from the local system.
+// Reads ~/.atomcode/auth.toml which stores the OAuth access token and user info
+// from AtomCode's login flow.
 func LoadFromSystem() (*Credentials, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return nil, err
 	}
+
+	// Primary: parse ~/.atomcode/auth.toml (TOML format with user info)
+	authFile := home + "/.atomcode/auth.toml"
+	data, err := os.ReadFile(authFile)
+	if err == nil {
+		creds := parseAuthToml(string(data))
+		if creds != nil {
+			return creds, nil
+		}
+	}
+
+	// Fallback: try ~/.atomcode/config.toml (old format with api_key)
 	paths := []string{
-		home + "/.atomcode/auth.toml",
 		home + "/.atomcode/config.toml",
 	}
 	for _, p := range paths {
@@ -152,10 +122,13 @@ func LoadFromSystem() (*Credentials, error) {
 		if err != nil {
 			continue
 		}
-		// Simple TOML-like parse for api_key
 		for _, line := range strings.Split(string(data), "\n") {
 			line = strings.TrimSpace(line)
 			if strings.HasPrefix(line, "api_key") || strings.HasPrefix(line, "token") {
+				// Skip token_type lines
+				if strings.HasPrefix(line, "token_type") {
+					continue
+				}
 				parts := strings.SplitN(line, "=", 2)
 				if len(parts) == 2 {
 					val := strings.TrimSpace(parts[1])
@@ -167,7 +140,47 @@ func LoadFromSystem() (*Credentials, error) {
 			}
 		}
 	}
-	return nil, fmt.Errorf("no credentials found in %s", strings.Join(paths, ", "))
+	return nil, fmt.Errorf("no credentials found in %s", strings.Join(append([]string{authFile}, paths...), ", "))
+}
+
+// parseAuthToml parses the AtomCode auth.toml file to extract access_token and user ID.
+// TOML format:
+//
+//	access_token = "..."
+//	[user]
+//	id = "..."
+func parseAuthToml(content string) *Credentials {
+	var accessToken, userID string
+
+	for _, line := range strings.Split(content, "\n") {
+		line = strings.TrimSpace(line)
+		// Skip section headers and empty lines
+		if line == "" || strings.HasPrefix(line, "[") {
+			continue
+		}
+		parts := strings.SplitN(line, "=", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		key := strings.TrimSpace(parts[0])
+		val := strings.TrimSpace(parts[1])
+		val = strings.Trim(val, `"`)
+
+		switch key {
+		case "access_token":
+			accessToken = val
+		case "id":
+			userID = val
+		}
+	}
+
+	if accessToken == "" {
+		return nil
+	}
+	if userID == "" {
+		userID = "local"
+	}
+	return &Credentials{Token: accessToken, UserID: userID}
 }
 
 // GenerateToken creates a JWT-like signed token using the secret.

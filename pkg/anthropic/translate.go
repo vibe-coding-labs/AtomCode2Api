@@ -1,6 +1,7 @@
 package anthropic
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 )
@@ -54,7 +55,17 @@ func extractTextContent(blocks []ContentBlock) string {
 			texts = append(texts, fmt.Sprintf("[Using tool: %s]", block.Name))
 		case "tool_result":
 			if block.Content != nil {
-				// Tool result content is []ContentBlock
+				var nested []ContentBlock
+				if err := json.Unmarshal(block.Content, &nested); err == nil {
+					texts = append(texts, extractTextContent(nested))
+				} else {
+					var s string
+					if json.Unmarshal(block.Content, &s) == nil {
+						texts = append(texts, s)
+					} else {
+						texts = append(texts, string(block.Content))
+					}
+				}
 				continue
 			}
 		}

@@ -1,5 +1,10 @@
 package anthropic
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // MessageRequest is an Anthropic Messages API request.
 type MessageRequest struct {
 	Model       string          `json:"model"`
@@ -29,8 +34,34 @@ func (j jsonField) MarshalJSON() ([]byte, error) {
 
 // Message represents a message in the Anthropic Messages API.
 type Message struct {
-	Role    string            `json:"role"`
-	Content []ContentBlock    `json:"content,omitempty"`
+	Role    string       `json:"role"`
+	Content ContentField `json:"content,omitempty"`
+}
+
+// ContentField handles content that can be a string or []ContentBlock.
+type ContentField []ContentBlock
+
+func (c *ContentField) UnmarshalJSON(data []byte) error {
+	// Try as array of ContentBlock first
+	var blocks []ContentBlock
+	if err := json.Unmarshal(data, &blocks); err == nil {
+		*c = blocks
+		return nil
+	}
+	// Try as plain string
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		*c = []ContentBlock{{Type: "text", Text: s}}
+		return nil
+	}
+	return fmt.Errorf("content must be a string or array of content blocks")
+}
+
+func (c ContentField) MarshalJSON() ([]byte, error) {
+	if len(c) == 1 && c[0].Type == "text" {
+		return json.Marshal(c[0].Text)
+	}
+	return json.Marshal([]ContentBlock(c))
 }
 
 // ContentBlock represents a content block in an Anthropic message.

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/store"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/store"
 )
 
 func testStore(t *testing.T) *store.Store {
@@ -23,7 +23,7 @@ func testStore(t *testing.T) *store.Store {
 }
 
 func TestServeStaticIndex(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 	r := httptest.NewRequest("GET", "/", nil)
 	w := httptest.NewRecorder()
 	h.ServeStatic(w, r)
@@ -33,7 +33,7 @@ func TestServeStaticIndex(t *testing.T) {
 }
 
 func TestAPIRoutes(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 	paths := []string{
 		"/api/auth/status",
 		"/api/stats",
@@ -52,7 +52,7 @@ func TestAPIRoutes(t *testing.T) {
 }
 
 func TestAuthStatus(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 	r := httptest.NewRequest("GET", "/api/auth/status", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -64,7 +64,7 @@ func TestAuthStatus(t *testing.T) {
 }
 
 func TestAuthSetupThenLogin(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 
 	// Setup password
 	body := `{"password":"test123"}`
@@ -89,7 +89,7 @@ func TestAuthSetupThenLogin(t *testing.T) {
 }
 
 func TestHandleModels(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 	r := httptest.NewRequest("GET", "/api/models", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()
@@ -101,7 +101,7 @@ func TestHandleModels(t *testing.T) {
 }
 
 func TestHandleStats(t *testing.T) {
-	h := NewHandler(testStore(t), nil, nil)
+	h := NewHandler(testStore(t), nil, nil, nil)
 	r := httptest.NewRequest("GET", "/api/stats", nil)
 	w := httptest.NewRecorder()
 	mux := http.NewServeMux()

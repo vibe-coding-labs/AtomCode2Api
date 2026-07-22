@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/store"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/store"
 )
 
 // Handler implements the Anthropic Messages API.
@@ -253,11 +253,16 @@ func translateToAnthropicResponse(events []atmc.SSEEvent, model string) map[stri
 			})
 		case "tool_start":
 			hasToolUse = true
+			var input any = ev.Arguments
+			var parsed any
+			if json.Unmarshal([]byte(ev.Arguments), &parsed) == nil {
+				input = parsed
+			}
 			contentBlocks = append(contentBlocks, map[string]any{
 				"type":  "tool_use",
 				"id":    ev.ID,
 				"name":  ev.Name,
-				"input": ev.Arguments,
+				"input": input,
 			})
 		case "tokens":
 			resp["usage"] = map[string]any{

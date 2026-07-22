@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
 )
 
 func mockDaemon() *httptest.Server {

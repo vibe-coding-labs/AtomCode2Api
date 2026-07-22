@@ -3,7 +3,7 @@ package openai
 import (
 	"testing"
 
-	"github.com/vibe-coding-labs/AtomCodeProxy/pkg/atmc"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
 )
 
 func TestTranslateToOpenAIResponse(t *testing.T) {
