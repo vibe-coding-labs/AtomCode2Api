@@ -237,14 +237,6 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 			var errMsg string
 			if rw.statusCode >= 400 {
 				errMsg = fmt.Sprintf("HTTP %d on %s %s", rw.statusCode, r.Method, path)
-				if body := rw.body.String(); body != "" {
-					// Truncate to 200 chars to avoid leaking secrets in logs
-					sanitized := body
-					if len(sanitized) > 200 {
-						sanitized = sanitized[:200] + "..."
-					}
-					errMsg = fmt.Sprintf("%s\n%s", errMsg, sanitized)
-				}
 				slog.Error("proxy error",
 					"request_id", reqID,
 					"status", rw.statusCode,
@@ -252,10 +244,8 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 					"path", path,
 					"model", model,
 					"latency_ms", latency,
-					"error", errMsg,
 				)
 			}
-			s.LogRequest(userID, model, path, isStream, rw.statusCode, latency, errMsg, inputTokens, outputTokens)
 			s.LogRequest(userID, model, path, isStream, rw.statusCode, latency, errMsg, inputTokens, outputTokens)
 		}
 	})
