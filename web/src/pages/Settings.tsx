@@ -44,10 +44,10 @@ const FIELD_GROUPS = [
       {
         key: 'default_max_tokens',
         label: '默认最大输出 Token',
-        tooltip: '客户端未指定 max_tokens 时的默认值。更大值允许更长回复，但消耗更多配额',
+        tooltip: '客户端未指定 max_tokens 时的默认值。更大值允许更长回复，但消耗更多配额。注意：此值由客户端 SDK 控制，服务端配置仅作为参考',
         placeholder: '8192',
         type: 'number' as const,
-        tag: '已生效',
+        tag: '参考值',
       },
     ],
   },
@@ -60,12 +60,12 @@ const FIELD_GROUPS = [
         tooltip: '请求失败时的自动重试次数。网络不稳定时可适当增加',
         placeholder: '3',
         type: 'number' as const,
-        tag: '已生效',
+        tag: '待实现',
       },
       {
         key: 'request_timeout',
         label: '请求超时（秒）',
-        tooltip: '与后端通信的读取超时时间，低于 60 秒会自动调整为 60 秒',
+        tooltip: '与后端通信的读取超时时间，低于 60 秒会自动调整为 60 秒。修改后立即生效',
         placeholder: '120',
         type: 'number' as const,
         suffix: '秒',
@@ -74,10 +74,10 @@ const FIELD_GROUPS = [
       {
         key: 'max_connections',
         label: '最大连接数',
-        tooltip: '与后端的最大并发 HTTP 连接数，修改后 10 秒内自动生效',
+        tooltip: '与后端的最大并发 HTTP 连接数',
         placeholder: '20',
         type: 'number' as const,
-        tag: '已生效',
+        tag: '待实现',
       },
     ],
   },
@@ -87,7 +87,7 @@ const FIELD_GROUPS = [
       {
         key: 'enable_request_logging',
         label: '启用请求日志',
-        tooltip: '记录每个 API 请求的详细信息（模型、延迟、状态码）。关闭后「数据概览」页面将无数据',
+        tooltip: '记录每个 API 请求的详细信息（模型、延迟、状态码）。关闭后「数据概览」页面将无数据。修改后立即生效',
         placeholder: 'true',
         type: 'switch' as const,
         tag: '已生效',
@@ -99,7 +99,7 @@ const FIELD_GROUPS = [
         placeholder: '30',
         type: 'number' as const,
         suffix: '天',
-        tag: '已生效',
+        tag: '待实现',
       },
     ],
   },
@@ -116,9 +116,6 @@ const SettingsPage: React.FC = () => {
     setLoading(true);
     try {
       const data = await api.getSettings();
-      // 后端设置统一存为字符串。switch 字段需转回布尔再回填表单，
-      // 否则存着的 "false"（字符串）会被当成 truthy 而显示成「开」，
-      // 误导用户。判定与后端一致：!= "false" 即视为开启。
       const switchKeys: string[] = [];
       for (const group of FIELD_GROUPS) {
         for (const field of group.fields) {
@@ -266,9 +263,7 @@ const SettingsPage: React.FC = () => {
             title={<Text strong style={{ fontSize: 15 }}>{group.title}</Text>}
             style={{ marginBottom: 16, borderRadius: 2, border: '1px solid #f0f0f0' }}
             styles={{ body: { padding: '20px 24px' } }}
-            extra={
-              <SettingOutlined style={{ color: '#e8a050' }} />
-            }
+            extra={<SettingOutlined style={{ color: '#e8a050' }} />}
           >
             <Row gutter={[24, 0]}>
               {group.fields.map((field) => (

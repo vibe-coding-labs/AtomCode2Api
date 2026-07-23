@@ -81,6 +81,16 @@ func runServe() error {
 		autoImportDaemon(s)
 	}
 
+	// Apply settings from store to active components
+	if s != nil {
+		timeoutSec := s.GetIntSetting("request_timeout", 120)
+		if timeoutSec < 60 {
+			timeoutSec = 60
+		}
+		client.SetTimeout(time.Duration(timeoutSec) * time.Second)
+		log.Printf("settings: request_timeout=%ds", timeoutSec)
+	}
+
 	srv := openai.NewServer(client, s)
 	anth := anthropic.NewHandler(client, s)
 	dash := dashboard.NewHandler(s, nil, nil, client)
@@ -237,6 +247,14 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 			var errMsg string
 			if rw.statusCode >= 400 {
 				errMsg = fmt.Sprintf("HTTP %d on %s %s", rw.statusCode, r.Method, path)
+				if body := rw.body.String(); body != "" {
+					// Truncate to 200 chars to avoid leaking secrets in logs
+					sanitized := body
+					if len(sanitized) > 200 {
+						sanitized = sanitized[:200] + "..."
+					}
+					errMsg = fmt.Sprintf("%s\n%s", errMsg, sanitized)
+				}
 				slog.Error("proxy error",
 					"request_id", reqID,
 					"status", rw.statusCode,
@@ -244,9 +262,13 @@ func requestLogMiddleware(next http.Handler, s *store.Store) http.Handler {
 					"path", path,
 					"model", model,
 					"latency_ms", latency,
+					"error", errMsg,
 				)
 			}
-			s.LogRequest(userID, model, path, isStream, rw.statusCode, latency, errMsg, inputTokens, outputTokens)
+			// Check if request logging is enabled in settings
+			if s.GetSetting("enable_request_logging") != "false" {
+				s.LogRequest(userID, model, path, isStream, rw.statusCode, latency, errMsg, inputTokens, outputTokens)
+			}
 		}
 	})
 }
