@@ -1,170 +1,37 @@
 # AtomCode2API
 
-**A reverse proxy that translates AtomCode Daemon's private API into standard OpenAI/Anthropic APIs. Turn your free CodingPlan quota into a universal AI endpoint.**
-
-[English](#english) | [简体中文](#简体中文)
-
----
-
-## English
-
-> AtomCode2API is an engineering implementation based on reverse-engineered analysis of the [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) daemon protocol. It acts as a protocol translation layer between your favorite AI tools (Claude Code, Cursor, Cline) and the AtomCode local daemon, exposing its CodingPlan free-tier AI quota through standard OpenAI and Anthropic-compatible APIs.
-
-### Problem
-
-AtomCode (a Chinese AI coding assistant) provides a **CodingPlan Lite** free tier with generous monthly quotas:
-- **deepseek-v4-flash** model with **1M context** tokens
-- **8,000 requests/month** (≈267/day), **500 requests per 5-hour window**
-
-However, AtomCode uses its own private daemon protocol (`localhost:13456`). Mainstream AI coding tools like **Claude Code**, **Cursor**, and **Cline** only support standard OpenAI Chat Completions or Anthropic Messages APIs — they cannot directly connect to AtomCode.
-
-**AtomCode2API solves this** by sitting between your tools and the daemon, translating requests and responses in real-time.
-
-### Architecture
-
-```
-Your AI Tool (Claude Code / Cursor / Cline)
-  │ POST /v1/chat/completions (OpenAI) or POST /v1/messages (Anthropic)
-  ▼
-AtomCode2API (:13457) ─── protocol translation layer
-  │ POST /chat (SSE stream)
-  ▼
-AtomCode Daemon (:13456) ─── private daemon protocol
-  │ → llm-api.atomgit.com (upstream)
-  ▼
-AI Models (deepseek-v4-flash, etc.)
-```
-
-### Features
-
-| Feature | Details |
-|---------|---------|
-| **Dual Protocol** | OpenAI Chat Completions (`/v1/chat/completions`) + Anthropic Messages (`/v1/messages`) |
-| **Streaming** | SSE streaming for both protocols, real-time token-by-token output |
-| **Tool Calling** | Full tool_use/tool_call translation — file operations, commands, etc. |
-| **Reasoning** | Maps daemon `reasoning` events to OpenAI `reasoning_content` / Anthropic `thinking` blocks |
-| **Session Persistence** | Multi-turn conversation context tracked via daemon `session_id` (30-minute TTL) |
-| **Daemon Mode** | Background supervisor with automatic crash restart (exponential backoff: 1s→2s→4s→...→30s) |
-| **Health Monitoring** | Auto-detects daemon status, logged-in state, and model availability |
-| **Request Logging** | SQLite-backed request history with model, latency, token usage |
-| **TLS Support** | Auto-generated self-signed certificate for HTTPS |
-| **Log Rotation** | Automatic log rotation with configurable size limits and retention |
-| **Docker** | Multi-stage Dockerfile for containerized deployment |
-
-### Quick Start
-
-```bash
-# 1. Make sure AtomCode daemon is running
-atomcode daemon
-
-# 2. First time: login & claim CodingPlan
-atomcode-2api setup
-
-# 3. Start the proxy
-atomcode-2api serve
-
-# 4. Configure Claude Code
-export ANTHROPIC_BASE_URL=http://localhost:13457
-export ANTHROPIC_API_KEY=atomcode
-claude
-```
-
-### Daemon Mode (Background Service)
-
-```bash
-# Start as background daemon (auto-restart on crash)
-atomcode-2api daemon start
-
-# Check status
-atomcode-2api daemon status
-
-# View logs (last N lines)
-atomcode-2api daemon logs
-
-# Stop
-atomcode-2api daemon stop
-```
-
-### API Endpoints
-
-| Path | Method | Protocol | Description |
-|------|--------|----------|-------------|
-| `POST /v1/chat/completions` | OpenAI | Chat Completions API | For Cursor, Cline, etc. |
-| `POST /v1/messages` | Anthropic | Messages API | For Claude Code |
-| `GET /v1/models` | - | Model list | Available models from daemon |
-| `GET /health` | - | Health check | Daemon + auth status |
-
-### CLI Commands
-
-```
-atomcode-2api serve         Start proxy server
-atomcode-2api setup         Login + CodingPlan claim
-atomcode-2api login         OAuth login only
-atomcode-2api daemon        Background service management
-atomcode-2api models        List available models
-atomcode-2api status        Show daemon/proxy status
-atomcode-2api whoami        Show current logged-in user
-atomcode-2api check         Full health check
-atomcode-2api config show   Show configuration
-```
-
-### Build
-
-```bash
-go build -o atomcode-2api ./cmd/atomcode-2api/
-```
-
-### Project Structure
-
-```
-cmd/atomcode-2api/    CLI entry (cobra commands)
-pkg/atmc/              AtomCode daemon HTTP client + SSE translator
-pkg/openai/            OpenAI protocol handler
-pkg/anthropic/         Anthropic protocol handler
-pkg/store/             SQLite storage (accounts, settings, logs)
-pkg/auth/              JWT auth + encryption
-pkg/logrot/            Log rotation
-pkg/keepalive/         Credential keepalive
-pkg/dashboard/         Web dashboard API (planned)
-pkg/proxy/             Session tracking
-```
-
-### License
-
-Apache 2.0
+> **将 AtomCode Daemon 的私有协议转换为标准的 OpenAI / Anthropic 兼容 API。**
+> 把你的 CodingPlan 免费额度变成通用的 AI 接口，让 Claude Code、Codex、Cursor、Cline 等工具都能用上。
+>
+> _A reverse proxy that translates AtomCode Daemon's private API into standard OpenAI/Anthropic-compatible APIs. Turn your free CodingPlan quota into a universal AI endpoint._
 
 ---
 
-## 简体中文
+## 解决的问题 / Problem
 
-> AtomCode2API 是基于 [AtomCode](https://atomgit.com/atomgit_atomcode/atomcode) Daemon 协议逆向分析的工程化实现。它在你的 AI 工具和 AtomCode 本地 daemon 之间充当协议翻译层，将 AtomCode 的 CodingPlan 免费 AI 额度通过标准的 OpenAI 和 Anthropic 兼容 API 暴露出来。
+[AtomCode](https://atomcode.atomgit.com/) 是一个国产 AI 编程助手，提供 **CodingPlan Lite** 免费套餐，包含 **deepseek-v4-flash** 模型（1M 上下文窗口）和每月数千次免费请求。
 
-### 问题
+但 AtomCode 使用**私有 daemon 协议**（`localhost:13456`），主流的 AI 工具（Claude Code、Codex、Cursor、Cline）只支持标准 OpenAI/Anthropic API，无法直接连接 AtomCode。
 
-AtomCode（一个国产 AI 编程助手）提供了 **CodingPlan Lite** 免费套餐，包含不错的额度：
-- **deepseek-v4-flash** 模型，**1M 上下文** tokens
-- 每月 **8,000 次请求**（日均 ~267 次），每 5 小时 **500 次** 短期窗口
+**AtomCode2API 充当翻译层**，让你的工具通过标准协议使用 AtomCode 的免费额度。
 
-然而 AtomCode 使用的是自己的私有 daemon 协议（`localhost:13456`）。主流的 AI 编程工具如 **Claude Code**、**Cursor**、**Cline** 只支持标准的 OpenAI Chat Completions 或 Anthropic Messages API — 它们无法直连 AtomCode。
-
-**AtomCode2API 解决了这个问题**：它充当工具和 daemon 之间的翻译层，实时转换请求和响应。
-
-### 架构
+## 架构 / Architecture
 
 ```
-AI 工具 (Claude Code / Cursor / Cline)
-  │ POST /v1/chat/completions (OpenAI) 或 POST /v1/messages (Anthropic)
+AI 工具 (Claude Code / Codex / Cursor / Cline)
+  │ POST /v1/chat/completions (OpenAI)
+  │ POST /v1/messages (Anthropic)
   ▼
 AtomCode2API (:13457) ─── 协议翻译层
-  │ POST /chat (SSE 流)
+  │ POST /chat (SSE stream)
   ▼
 AtomCode Daemon (:13456) ─── 私有 daemon 协议
-  │ → llm-api.atomgit.com (上游 API)
+  │ → llm-api.atomgit.com
   ▼
-AI 模型 (deepseek-v4-flash 等)
+AI 模型 (deepseek-v4-flash, Qwen3-VL, etc.)
 ```
 
-### 功能特性
+## 功能特性 / Features
 
 | 特性 | 说明 |
 |------|------|
@@ -173,52 +40,134 @@ AI 模型 (deepseek-v4-flash 等)
 | **工具调用** | 完整的 tool_use/tool_call 翻译，文件操作、命令执行等 |
 | **推理过程** | daemon reasoning → OpenAI reasoning_content / Anthropic thinking |
 | **多轮对话** | 基于 daemon session_id 的上下文保持（30 分钟过期） |
-| **守护进程** | 后台运行 + 崩溃自动重启（指数退避：1s→2s→4s→...→30s） |
-| **健康监控** | 自动检测 daemon 状态、登录状态、模型可用性 |
+| **Web 管理面板** | 内置 Dashboard，管理账号、查看统计、配置设置 |
+| **账号管理** | 多账号支持、一键导入、OAuth 授权登录、Token 管理 |
 | **请求日志** | SQLite 记录请求历史（模型、延迟、Token 用量）|
-| **TLS 支持** | 自动生成自签名证书，支持 HTTPS |
-| **日志轮转** | 自动日志轮转，可配置大小和保留数量 |
-| **Docker 部署** | 多阶段构建 Dockerfile |
+| **Docker 部署** | 多阶段构建，一行命令启动 |
 
-### 快速开始
+## 快速开始 / Quick Start
+
+### 前置条件
+
+- [AtomCode](https://atomcode.atomgit.com/) 已安装并登录
+- Go 1.25+（本地构建）或 Docker（容器化部署）
+
+### 方式一：本地运行
 
 ```bash
 # 1. 确保 AtomCode daemon 在运行
-atomcode daemon
+atomcode daemon --port 13456 --idle-timeout 0
 
-# 2. 首次使用：登录 + 领取 CodingPlan
-atomcode-2api setup
+# 2. 克隆并构建
+git clone https://github.com/vibe-coding-labs/AtomCode2Api.git
+cd AtomCode2Api
+go build -o atomcode-2api ./cmd/atomcode-2api/
 
 # 3. 启动代理
-atomcode-2api serve
+./atomcode-2api serve -v
 
-# 4. 配置 Claude Code
+# 访问管理面板
+# http://localhost:13457/
+```
+
+### 方式二：Docker 运行
+
+```bash
+# 构建镜像
+docker build -t atomcode-2api .
+
+# 运行（与宿主机 daemon 通信）
+docker run -d \
+  --name atomcode-2api \
+  --add-host host.docker.internal:host-gateway \
+  -p 13457:13457 \
+  -v atomcode-data:/data \
+  atomcode-2api
+
+# 访问管理面板
+# http://localhost:13457/
+```
+
+### 配置 Claude Code
+
+```bash
 export ANTHROPIC_BASE_URL=http://localhost:13457
-export ANTHROPIC_API_KEY=atomcode
+export ANTHROPIC_API_KEY=sk-atmc-xxxxx
+export ANTHROPIC_MODEL=deepseek-v4-flash
 claude
 ```
 
-### 配置 Cursor（OpenAI 协议）
+### 配置 Codex / OpenAI SDK
 
-在 Cursor Settings → Models 中：
-- **API Base URL**: `http://localhost:13457/v1`
-- **API Key**: 任意值（可以为空）
-- **Model**: `deepseek-v4-flash`
-
-### CLI 命令
-
-```
-atomcode-2api serve         启动代理服务器
-atomcode-2api setup         登录 + 领取 CodingPlan
-atomcode-2api daemon        守护进程管理
-atomcode-2api models        列出可用模型
-atomcode-2api status        查看状态
-atomcode-2api check         全面健康检查
-atomcode-2api whoami        当前用户信息
-atomcode-2api config show   查看配置
+```bash
+export OPENAI_BASE_URL=http://localhost:13457/v1
+export OPENAI_API_KEY=sk-atmc-xxxxx
+export OPENAI_MODEL=deepseek-v4-flash
+codex exec "你的问题"
 ```
 
-### 项目结构
+### 快捷启动脚本
+
+在 `~/.zshrc` 中添加：
+
+```bash
+# 启动 Claude Code 连接到本代理
+alias atomcode-cc='ANTHROPIC_BASE_URL=http://localhost:13457 \
+ANTHROPIC_API_KEY=$(curl -s http://localhost:13457/api/accounts | python3 -c "import sys,json; print(json.load(sys.stdin)[\"accounts\"][0][\"api_token\"])") \
+ANTHROPIC_MODEL=deepseek-v4-flash \
+claude --dangerously-skip-permissions'
+
+# 启动 Codex 连接到本代理
+alias atomcode-codex='OPENAI_BASE_URL=http://localhost:13457/v1 \
+OPENAI_API_KEY=$(curl -s http://localhost:13457/api/accounts | python3 -c "import sys,json; print(json.load(sys.stdin)[\"accounts\"][0][\"api_token\"])") \
+OPENAI_MODEL=deepseek-v4-flash \
+codex'
+```
+
+## Web 管理面板
+
+访问 `http://localhost:13457/` 进入 Dashboard：
+
+| 页面 | 路径 | 功能 |
+|------|------|------|
+| 数据概览 | `/dashboard` | 请求统计、图表、模型用量 |
+| 账号管理 | `/accounts` | 添加/导入/导出账号，管理 Token |
+| 账号详情 | `/accounts/:userId` | 快速接入命令、模型目录、请求日志 |
+| 系统设置 | `/settings` | 请求超时、日志开关、修改密码 |
+
+## API 端点
+
+| 路径 | 方法 | 协议 | 说明 |
+|------|------|------|------|
+| `POST /v1/chat/completions` | OpenAI | Chat Completions | 对话补全（支持流式） |
+| `POST /v1/messages` | Anthropic | Messages API | 对话补全（支持流式） |
+| `GET /v1/models` | - | Model list | 可用模型列表 |
+| `GET /health` | - | Health check | 健康检查 |
+
+## 可用模型 / Available Models
+
+| 模型 | 提供商 | 上下文 | CodingPlan |
+|------|--------|--------|:----------:|
+| **deepseek-v4-flash** | AtomGit | 1,000,000 | ✅ 免费 |
+| **Qwen/Qwen3-VL-8B-Instruct** | AtomGit | 64,000 | ✅ 免费 |
+| **deepseek-chat** | DeepSeek | 128,000 | ❌ 需 Pro |
+| **deepseek-reasoner** | DeepSeek | 128,000 | ❌ 需 Pro |
+| **glm-5.2** | Zhipu AI | 128,000 | ❌ 需 Pro |
+
+## 构建 / Build
+
+```bash
+# 构建后端
+go build -o atomcode-2api ./cmd/atomcode-2api/
+
+# 构建前端（嵌入二进制）
+cd web && npm ci && npm run build
+
+# Docker 构建
+docker build -t atomcode-2api .
+```
+
+## 项目结构 / Project Structure
 
 ```
 cmd/atomcode-2api/    CLI 入口（cobra 命令）
@@ -227,12 +176,12 @@ pkg/openai/            OpenAI 协议层
 pkg/anthropic/         Anthropic 协议层
 pkg/store/             SQLite 存储（账号、设置、日志）
 pkg/auth/              JWT 认证 + 加密
-pkg/logrot/            日志轮转
+pkg/dashboard/         Web 管理面板
 pkg/keepalive/         凭据保活
-pkg/dashboard/         Web 管理面板 API（规划中）
 pkg/proxy/             会话追踪
+web/                   React 前端（TypeScript + Ant Design）
 ```
 
-### 许可证
+## 许可证 / License
 
 Apache 2.0
