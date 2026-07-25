@@ -124,6 +124,22 @@ pkg/dashboard/        Web 管理面板
 web/                  前端页面（React + Ant Design）
 ```
 
+## 提示词：让 AI agent 帮你本地构建
+
+如果你想让你的 AI agent（Claude Code、Codex 等）直接帮你把 AtomCode2API 在本地搭起来，把下面这段提示词复制给它就行：
+
+> 请帮我完成以下操作：
+>
+> 1. 克隆仓库：`git clone https://github.com/vibe-coding-labs/AtomCode2Api.git`
+> 2. 进入目录：`cd AtomCode2Api`
+> 3. 构建前端：`cd web && npm install && npm run build && cd ..`
+> 4. 构建后端：`go build -o atomcode-2api ./cmd/atomcode-2api/`
+> 5. 确保 AtomCode daemon 在运行（`atomcode daemon --port 13456 --idle-timeout 0`）
+> 6. 启动代理：`./atomcode-2api serve -v`
+> 7. 确认代理正常运行：`curl http://localhost:45678/api/health`
+>
+> 以上步骤完成后，代理服务会在 `http://localhost:45678/` 启动，管理面板可正常访问。
+
 ## 说在最后
 
 这个项目是开源的（Apache 2.0），如果你觉得有用，欢迎 star。如果你遇到问题，提 issue 就行。
