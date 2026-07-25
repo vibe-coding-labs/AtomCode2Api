@@ -15,7 +15,8 @@ before:
     - go mod tidy
 
 builds:
-  # Linux amd64
+  # ========== Linux ==========
+  # Linux amd64 (x86_64) — CGO enabled for SQLite
   - id: linux-amd64
     main: ./cmd/atomcode-2api/
     env:
@@ -30,7 +31,7 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
-  # Linux arm64
+  # Linux arm64 (aarch64, Raspberry Pi 4/5, AWS Graviton)
   - id: linux-arm64
     main: ./cmd/atomcode-2api/
     env:
@@ -45,7 +46,25 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
-  # Linux 386
+  # Linux armhf (arm 32-bit, Raspberry Pi 0-3)
+  - id: linux-armhf
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=1
+      - CC=arm-linux-gnueabihf-gcc
+    goos:
+      - linux
+    goarch:
+      - arm
+    goarm:
+      - "7"
+      - "6"
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # Linux 386 (32-bit)
   - id: linux-386
     main: ./cmd/atomcode-2api/
     env:
@@ -60,6 +79,49 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
+  # Linux riscv64 (open-source hardware)
+  - id: linux-riscv64
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - riscv64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # Linux ppc64le (PowerPC, IBM POWER)
+  - id: linux-ppc64le
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - ppc64le
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # Linux s390x (IBM mainframe)
+  - id: linux-s390x
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - s390x
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # ========== Windows ==========
   # Windows amd64
   - id: windows-amd64
     main: ./cmd/atomcode-2api/
@@ -90,7 +152,22 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
-  # Darwin amd64 (requires macOS or osxcross for CGO)
+  # Windows arm64 (ARM Surface, etc.)
+  - id: windows-arm64
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - windows
+    goarch:
+      - arm64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # ========== macOS (Darwin) ==========
+  # Intel Macs
   - id: darwin-amd64
     main: ./cmd/atomcode-2api/
     env:
@@ -104,7 +181,7 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
-  # Darwin arm64 (requires macOS or osxcross for CGO)
+  # Apple Silicon Macs
   - id: darwin-arm64
     main: ./cmd/atomcode-2api/
     env:
@@ -118,6 +195,35 @@ builds:
     ldflags:
       - -s -w -X main.Version={{ .Version }}
 
+  # ========== BSD ==========
+  # FreeBSD amd64
+  - id: freebsd-amd64
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - freebsd
+    goarch:
+      - amd64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
+  # OpenBSD amd64
+  - id: openbsd-amd64
+    main: ./cmd/atomcode-2api/
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - openbsd
+    goarch:
+      - amd64
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.Version={{ .Version }}
+
 archives:
   - formats: [tar.gz]
     name_template: >-
@@ -125,6 +231,7 @@ archives:
       {{- title .Os }}_
       {{- if eq .Arch "amd64" }}x86_64
       {{- else if eq .Arch "386" }}i386
+      {{- else if eq .Arch "arm" }}armhf
       {{- else }}{{ .Arch }}{{ end }}
       {{- if .Arm }}v{{ .Arm }}{{ end }}
     format_overrides:

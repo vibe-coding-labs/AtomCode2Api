@@ -2,6 +2,19 @@
 
 嗨，你好。如果你点进来了，大概是因为你也在用 AtomCode 的免费额度，想把它用到别的工具上？那来对地方了。
 
+> **想让你的 AI agent 帮你搭？** 把下面这段复制给 Claude Code 或 Codex 就行：
+>
+> ```
+> 请帮我完成以下操作：
+> 1. 克隆仓库：git clone https://github.com/vibe-coding-labs/AtomCode2Api.git
+> 2. 进入目录：cd AtomCode2Api
+> 3. 构建前端：cd web && npm install && npm run build && cd ..
+> 4. 构建后端：go build -o atomcode-2api ./cmd/atomcode-2api/
+> 5. 确保 AtomCode daemon 在运行（atomcode daemon --port 13456 --idle-timeout 0）
+> 6. 启动代理：./atomcode-2api serve -v
+> 7. 确认代理正常运行：curl http://localhost:45678/api/health
+> ```
+
 ## 这东西是干嘛的
 
 简单说就是：**AtomCode 有个免费版（CodingPlan Lite），每个月能免费用很多次 AI。但 Claude Code、Cursor、Codex 这些工具连不上它，因为 AtomCode 用的是自己的私有协议，不是标准的 OpenAI 接口。**
@@ -123,22 +136,6 @@ pkg/auth/             认证相关
 pkg/dashboard/        Web 管理面板
 web/                  前端页面（React + Ant Design）
 ```
-
-## 提示词：让 AI agent 帮你本地构建
-
-如果你想让你的 AI agent（Claude Code、Codex 等）直接帮你把 AtomCode2API 在本地搭起来，把下面这段提示词复制给它就行：
-
-> 请帮我完成以下操作：
->
-> 1. 克隆仓库：`git clone https://github.com/vibe-coding-labs/AtomCode2Api.git`
-> 2. 进入目录：`cd AtomCode2Api`
-> 3. 构建前端：`cd web && npm install && npm run build && cd ..`
-> 4. 构建后端：`go build -o atomcode-2api ./cmd/atomcode-2api/`
-> 5. 确保 AtomCode daemon 在运行（`atomcode daemon --port 13456 --idle-timeout 0`）
-> 6. 启动代理：`./atomcode-2api serve -v`
-> 7. 确认代理正常运行：`curl http://localhost:45678/api/health`
->
-> 以上步骤完成后，代理服务会在 `http://localhost:45678/` 启动，管理面板可正常访问。
 
 ## 说在最后
 
