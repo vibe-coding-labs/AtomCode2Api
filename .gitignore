@@ -1,5 +1,12 @@
+/atomcode-2api
 /atomcode-proxy
 /tmp/
 *.test
 *.out
 .DS_Store
+*.pyc
+__pycache__/
+counter.py
+hello.py
+hello.txt
+test_results.txt
