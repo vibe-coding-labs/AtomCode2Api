@@ -15,7 +15,7 @@ AtomCode2API 就是一个"翻译官"——它坐在你的工具和 AtomCode 之�
 装好之后，你会有个 Web 管理面板，打开浏览器就能看到：
 
 ```
-http://localhost:13457/
+http://localhost:45678/
 ```
 
 里面有这么几个页面：
@@ -58,7 +58,7 @@ go build -o atomcode-2api ./cmd/atomcode-2api/
 ./atomcode-2api serve -v
 ```
 
-然后打开 http://localhost:13457/ 就能看到管理面板了。
+然后打开 http://localhost:45678/ 就能看到管理面板了。
 
 ### 方式二：Docker 跑
 
@@ -66,7 +66,7 @@ go build -o atomcode-2api ./cmd/atomcode-2api/
 docker build -t atomcode-2api .
 docker run -d --name atomcode-2api \
   --add-host host.docker.internal:host-gateway \
-  -p 13457:13457 \
+  -p 45678:45678 \
   atomcode-2api
 ```
 
@@ -75,7 +75,7 @@ docker run -d --name atomcode-2api \
 ### 配置 Claude Code
 
 ```bash
-export ANTHROPIC_BASE_URL=http://localhost:13457
+export ANTHROPIC_BASE_URL=http://localhost:45678
 export ANTHROPIC_API_KEY=sk-atmc-xxxxx
 export ANTHROPIC_MODEL=deepseek-v4-flash
 claude
@@ -86,7 +86,7 @@ claude
 ### 配置 Codex
 
 ```bash
-export OPENAI_BASE_URL=http://localhost:13457/v1
+export OPENAI_BASE_URL=http://localhost:45678/v1
 export OPENAI_API_KEY=sk-atmc-xxxxx
 export OPENAI_MODEL=deepseek-v4-flash
 codex exec "你的问题"
@@ -95,7 +95,7 @@ codex exec "你的问题"
 ### 配置 Cursor
 
 在 Cursor Settings → Models 里填：
-- API Base URL: `http://localhost:13457/v1`
+- API Base URL: `http://localhost:45678/v1`
 - API Key: 从管理面板复制
 - Model: `deepseek-v4-flash`
 

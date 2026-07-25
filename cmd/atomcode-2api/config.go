@@ -72,7 +72,7 @@ func defaultConfig() Config {
 	return Config{
 		Server: ServerConfig{
 			Host: "0.0.0.0",
-			Port: 13457,
+			Port: 45678,
 			TLS:  false,
 		},
 		Daemon: DaemonConfig{

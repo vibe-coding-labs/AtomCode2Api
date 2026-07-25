@@ -331,9 +331,9 @@ const Accounts: React.FC = () => {
           children: (
             <div>
               <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>Claude Code</Typography.Text>
-              <Typography.Paragraph code copyable style={{ background: '#f5f5f5', padding: '8px 12px', borderRadius: 3, marginBottom: 12, fontSize: 13 }}>{`export ANTHROPIC_BASE_URL=http://192.168.1.90:13457\nexport ANTHROPIC_API_KEY=sk-atmc-...`}</Typography.Paragraph>
+              <Typography.Paragraph code copyable style={{ background: '#f5f5f5', padding: '8px 12px', borderRadius: 3, marginBottom: 12, fontSize: 13 }}>{`export ANTHROPIC_BASE_URL=http://192.168.1.90:45678\nexport ANTHROPIC_API_KEY=sk-atmc-...`}</Typography.Paragraph>
               <Typography.Text strong style={{ display: 'block', marginBottom: 8 }}>OpenAI SDK</Typography.Text>
-              <Typography.Paragraph code copyable style={{ background: '#f5f5f5', padding: '8px 12px', borderRadius: 3, marginBottom: 0, fontSize: 13 }}>{`from openai import OpenAI\nclient = OpenAI(base_url="http://192.168.1.90:13457/v1", api_key="sk-atmc-...")`}</Typography.Paragraph>
+              <Typography.Paragraph code copyable style={{ background: '#f5f5f5', padding: '8px 12px', borderRadius: 3, marginBottom: 0, fontSize: 13 }}>{`from openai import OpenAI\nclient = OpenAI(base_url="http://192.168.1.90:45678/v1", api_key="sk-atmc-...")`}</Typography.Paragraph>
             </div>
           ),
         }]} />

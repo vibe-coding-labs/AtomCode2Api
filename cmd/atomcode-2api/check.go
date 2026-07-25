@@ -64,6 +64,6 @@ var checkCmd = &cobra.Command{
 }
 
 func init() {
-	checkCmd.Flags().IntVarP(&checkPort, "port", "p", 13457, "检查端口")
+	checkCmd.Flags().IntVarP(&checkPort, "port", "p", 45678, "检查端口")
 	rootCmd.AddCommand(checkCmd)
 }

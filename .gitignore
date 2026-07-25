@@ -10,3 +10,5 @@ counter.py
 hello.py
 hello.txt
 test_results.txt
+# Added by goreleaser init:
+dist/

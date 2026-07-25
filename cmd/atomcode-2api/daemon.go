@@ -79,7 +79,7 @@ func init() {
 	daemonCmd.AddCommand(daemonStopCmd)
 	daemonCmd.AddCommand(daemonRestartCmd)
 	daemonCmd.AddCommand(daemonStatusCmd)
-	daemonCmd.PersistentFlags().IntVarP(&servePort, "port", "p", 13457, "绑定端口")
+	daemonCmd.PersistentFlags().IntVarP(&servePort, "port", "p", 45678, "绑定端口")
 	rootCmd.AddCommand(daemonCmd)
 }
 
@@ -110,7 +110,7 @@ func startDaemon() error {
 	cmd.Stdin = nil
 	cmd.Stdout = nil
 	cmd.Stderr = nil
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	cmd.SysProcAttr = procAttr()
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start daemon supervisor: %w", err)
@@ -220,7 +220,7 @@ func RunSupervisor(port int) {
 		cmd.Env = append(os.Environ(), daemonChildEnv+"=1")
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		cmd.SysProcAttr = procAttr()
 
 		log.Printf("[supervisor] spawning child process")
 		if err := cmd.Start(); err != nil {

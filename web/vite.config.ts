@@ -28,11 +28,11 @@ export default defineConfig({
     port: 37702,
     proxy: {
       '/api': {
-        target: 'http://localhost:13457',
+        target: 'http://localhost:45678',
         changeOrigin: true,
       },
       '/v1': {
-        target: 'http://localhost:13457',
+        target: 'http://localhost:45678',
         changeOrigin: true,
       },
     },

@@ -35,7 +35,7 @@ var serveCmd = &cobra.Command{
 	Short:   "启动代理服务器",
 	Long:    "启动 OpenAI/Anthropic 兼容的 API 代理服务器，将请求转发到 AtomCode Daemon。",
 	GroupID: "core",
-	Example: `  # 默认启动（0.0.0.0:13457）
+	Example: `  # 默认启动（0.0.0.0:45678）
   atomcode-2api serve
 
   # 指定端口
@@ -50,7 +50,7 @@ var serveCmd = &cobra.Command{
 
 func init() {
 	serveCmd.Flags().StringVarP(&serveHost, "host", "H", "0.0.0.0", "绑定地址")
-	serveCmd.Flags().IntVarP(&servePort, "port", "p", 13457, "绑定端口")
+	serveCmd.Flags().IntVarP(&servePort, "port", "p", 45678, "绑定端口")
 	rootCmd.AddCommand(serveCmd)
 }
 
