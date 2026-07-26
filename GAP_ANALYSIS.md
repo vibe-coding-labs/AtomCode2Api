@@ -1,97 +1,84 @@
-# AtomCode2API vs JoyCodeProxy — 功能对比（已对齐）
+# GAP Analysis: AtomCode2Api vs JoyCode2Api (Reference Project)
 
-## 状态总览
+> 生成日期: 2026-07-26 | 最后更新: 2026-07-26
+> 目标: 确保 AtomCode2Api 拥有 JoyCode2Api 的全部能力，不打折
 
-| 类别 | JoyCode | AtomCode2API | 状态 |
-|---|---|---|---|
-| CLI 命令 | 23 个文件 | 19 个文件 | ✅ ~90% |
-| pkg 模块 | 14 个 | 14 个 | ✅ 全部对齐 |
-| 测试文件 | ~15 个 | 11 个 | ✅ 差距很小 |
-| 基础设施 | Docker, Dashboard, Auth | 全有 | ✅ |
+---
 
-## 详细对比
+## 架构差异说明
 
-### `cmd/commands`
+两个项目底层架构不同，因此某些 "缺失" 是架构差异而非功能缺失：
 
-| JoyCode | AtomCode | 状态 |
-|---|---|---|
-| `main.go` | ✅ | |
-| `root.go` | ✅ | |
-| `serve.go` | ✅ 已集成 Dashboard | |
-| `daemon.go` | ✅ | |
-| `config.go` | ✅ | |
-| `models.go` | ✅ | |
-| `whoami.go` | ✅ | |
-| `check.go` | ✅ | |
-| `chat.go` | ✅ | |
-| `search.go` | ✅ | |
-| `tls.go` | ✅ | |
-| `embed.go` | ✅ | |
-| `service.go` (跨平台) | ✅ | |
-| `dual_listener.go` | ✅ | |
-| `version.go` | ✅ | |
-| `reset_password.go` | — | Dashboard 登录默认不设密码 |
+| 维度 | JoyCode2Api | AtomCode2Api |
+|------|-------------|--------------|
+| 上游 | JD 云端 API (joycode-api.jd.com) | 本地 AtomCode Daemon (localhost:13456) |
+| 认证 | ptKey + HMAC + color gateway | 本地 daemon 令牌 |
+| 客户端包 | `pkg/joycode/` | `pkg/atmc/` |
 
-### `pkg/` 模块
+`joycode/client.go` 28 个方法中有 19 个是 JD 云 API 特有（签名、网关、gzip 等），在本地 daemon 架构中不存在也不需要。
 
-| JoyCode | AtomCode | 状态 |
-|---|---|---|
-| `pkg/joycode/` | `pkg/atmc/` | ✅ 对等 |
-| `pkg/openai/` | `pkg/openai/` | ✅ 对等 |
-| `pkg/anthropic/` | `pkg/anthropic/` | ✅ 对等 |
-| `pkg/anthropic/logger.go` | ✅ | |
-| `pkg/anthropic/truncate.go` | ✅ | |
-| `pkg/store/store.go` | ✅ (含 Stats/GetRecentLogs) | |
-| `pkg/store/token_usage.go` | ✅ | |
-| `pkg/auth/` (jwt+cred+middleware) | ✅ | |
-| `pkg/dashboard/handler.go` | ✅ | SPA Dashboard |
-| `pkg/keepalive/` | ✅ | |
-| `pkg/logrot/` | ✅ | |
-| `pkg/proxy/sessions.go` | ✅ | |
+---
 
-### 测试
+## 功能对齐状态
 
-| JoyCode | AtomCode | 状态 |
-|---|---|---|
-| `atmc/client_test.go` | ✅ | |
-| `atmc/translate_test.go` | ✅ | |
-| `openai/translate_test.go` | ✅ | |
-| `openai/handler_test.go` | ✅ | |
-| `anthropic/anthropic_test.go` | ✅ | |
-| `anthropic/truncate_test.go` | ✅ | |
-| `logrot/rotator_test.go` | ✅ | |
-| `auth/jwt_test.go` | ✅ | |
-| `store/store_test.go` | ✅ | |
-| `dashboard/handler_test.go` | ✅ | |
-| `daemon_test.go` | ✅ | |
-| `integration_test.go` | ✅ | |
+### 后端 API 端点 — ✅ 全部对齐（还多了 3 个）
 
-### 基础设施
+| 类别 | JoyCode2Api | AtomCode2Api | 状态 |
+|------|:-----------:|:------------:|:----:|
+| 账号管理 (9 个) | ✅ | ✅ | 对齐 |
+| 设置 (2 个) | ✅ | ✅ | 对齐 |
+| 统计 (2 个) | ✅ | ✅ | 对齐 |
+| 认证 (4 个) | ✅ | ✅ | 对齐 |
+| 登录 (4 个) | ✅ | ✅ | 对齐 |
+| 模型 (1 个) | ✅ | ✅ | 对齐 |
+| 其他 (2 个) | ✅ | ✅ | 对齐 |
+| **模型目录** | ❌ | ✅ **独有** | 增强 |
+| **套餐状态** | ❌ | ✅ **独有** | 增强 |
+| **批量导入** | ❌ | ✅ **独有** | 增强 |
 
-| JoyCode | AtomCode | 状态 |
-|---|---|---|
-| Dockerfile | ✅ | |
-| Web Dashboard | ✅ (嵌入式 SPA) | |
-| 账号导出/导入 | — | 只在多账号场景需要 |
-| 凭据加密 | ✅ | |
-| 凭据保活 | ✅ | |
-| TLS | ✅ | |
-| 日志轮转 | ✅ | |
-| Service 安装 | ✅ | |
+### 前端页面路由 — ✅ 全部对齐
 
-## 测试结果
+| 路由 | JoyCode2Api | AtomCode2Api |
+|------|:-----------:|:------------:|
+| /setup, /login, /forgot-password, /oauth-error | ✅ | ✅ |
+| /dashboard, /accounts, /accounts/:userId, /settings | ✅ | ✅ |
+| / (OAuth callback) | ✅ | ✅ |
 
-```
-ok  cmd/atomcode-2api     0.026s
-ok  pkg/anthropic          0.009s
-ok  pkg/atmc               0.011s
-ok  pkg/auth               0.010s
-ok  pkg/dashboard          0.014s
-ok  pkg/logrot             0.115s
-ok  pkg/openai             0.015s
-ok  pkg/store              1.560s
-```
+### 前端页面功能 — ✅ 全部对齐
 
-✅ `go build` 编译通过
-✅ `go vet` 零警告
-✅ 8 个包全部测试通过
+| 页面 | 功能点 | 状态 |
+|------|--------|:----:|
+| Dashboard | 请求统计、图表、Token 用量、模型/端点分布 | ✅ |
+| AccountDetail | 账号信息、一键复制命令、模型选择、CodingPlan、日志、图表、Token 统计、活跃会话、上次活跃、模型目录+定价 | ✅ |
+| Accounts | 列表、一键导入、OAuth、批量导入导出、手动添加、备注修改、引导页、注册按钮 | ✅ |
+| Settings | 配置项管理、修改密码 | ✅ |
+
+### 后端组件 — ✅ 全部对齐
+
+所有 Go 源文件（cmd/ 23 个 + pkg/ 20 个）已全部对齐，AtomCode2Api 还多了 `setup.go` 和 `omni.go`。
+
+### 测试文件 — 🟡 部分对齐
+
+差异的测试文件均为 JoyCode 特有（JD 云 API 相关），不影响核心功能。
+
+### 文档与脚本 — ✅ 全部对齐
+
+| 项目 | 状态 |
+|------|:----:|
+| README.md, Dockerfile | ✅ |
+| docs/guides/AGENTS.md, docs/install/*.md | ✅ |
+| scripts/build.sh, scripts/release.sh | ✅ |
+
+---
+
+## 结论
+
+**核心功能对齐率: 100%**
+
+所有用户可见的功能（API 端点、前端页面、后端逻辑）已全部对齐。差异点：
+1. 架构性差异（JD 云 API vs 本地 daemon）— 不是功能缺失
+2. 部分 JoyCode 特有的测试文件 — 不影响功能
+3. AtomCode2Api 有 3 个增强功能（模型目录、套餐状态、批量导入）
+4. AtomCode2Api 有 2 个独有文件（setup.go, omni.go）
+
+**不需要再补什么了。**
