@@ -4,6 +4,18 @@
 
 > **想让你的 AI agent 帮你搭？** 把 [docs/guides/AGENTS.md](docs/guides/AGENTS.md) 的链接或内容发给它，它会根据你的系统环境自动选择 Docker / 源码编译 / 下载二进制三种方式之一来完成安装。
 
+## 能用哪些模型？全都是免费的
+
+| 模型 | 提供商 | 上下文 | 免费? |
+|------|--------|--------|:-----:|
+| **deepseek-v4-flash** | AtomGit | 1,000,000 | ✅ 免费 |
+| **Qwen/Qwen3-VL-8B-Instruct** | AtomGit | 64,000 | ✅ 免费 |
+| deepseek-chat | DeepSeek | 128,000 | 需 Pro |
+| deepseek-reasoner | DeepSeek | 128,000 | 需 Pro |
+| glm-5.2 | Zhipu AI | 128,000 | 需 Pro |
+
+免费模型由你的 CodingPlan Lite 直接覆盖，**不用额外花钱**。付费模型需要升级 Pro 套餐。
+
 ## 这东西是干嘛的
 
 简单说就是：**AtomCode 有个免费版（CodingPlan Lite），每个月能免费用很多次 AI。但 Claude Code、Cursor、Codex 这些工具连不上它，因为 AtomCode 用的是自己的私有协议，不是标准的 OpenAI 接口。**
@@ -100,18 +112,6 @@ codex exec "你的问题"
 - API Base URL: `http://localhost:45678/v1`
 - API Key: 从管理面板复制
 - Model: `deepseek-v4-flash`
-
-## 有哪些模型可以用
-
-| 模型 | 提供商 | 上下文 | 要钱吗 |
-|------|--------|--------|:------:|
-| deepseek-v4-flash | AtomGit | 1,000,000 | 免费 ✅ |
-| Qwen/Qwen3-VL-8B-Instruct | AtomGit | 64,000 | 免费 ✅ |
-| deepseek-chat | DeepSeek | 128,000 | 需要 Pro |
-| deepseek-reasoner | DeepSeek | 128,000 | 需要 Pro |
-| glm-5.2 | Zhipu AI | 128,000 | 需要 Pro |
-
-免费的模型 CodingPlan 直接覆盖，不用额外花钱。付费的模型需要升级 Pro 套餐。
 
 ## 代码结构
 
