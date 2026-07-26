@@ -100,3 +100,16 @@ type CodingPlanSetupResponse struct {
 	Providers       []ProviderConfig  `json:"providers,omitempty"`
 	Steps           map[string]any    `json:"steps,omitempty"`
 }
+
+type CodingPlanStatusResponse struct {
+	PlanName        string `json:"plan_name,omitempty"`
+	ExpiresAt       string `json:"expires_at,omitempty"`
+	RemainingDays   int    `json:"remaining_days,omitempty"`
+	TokenLimit      int64  `json:"token_limit,omitempty"`
+	TokensUsed      int64  `json:"tokens_used,omitempty"`
+	UsagePercent    int    `json:"usage_percent,omitempty"`
+	ResetsAt        string `json:"resets_at,omitempty"`
+	ModelName       string `json:"model_name,omitempty"`
+	PlanAvailable   bool   `json:"plan_available,omitempty"`
+	IsInfinite      bool   `json:"is_infinite,omitempty"`
+}

@@ -121,6 +121,31 @@ func (c *Client) CodingPlanSetup() (*CodingPlanSetupResponse, error) {
 	return &s, nil
 }
 
+// CodingPlanStatus retrieves the current CodingPlan usage and quota info.
+// This calls /codingplan/status which returns real-time quota data.
+func (c *Client) CodingPlanStatus() (*CodingPlanStatusResponse, error) {
+	_, data := c.syncGet("/codingplan/status")
+	// Try to parse as JSON; if it's the Angular SPA HTML, fallback quietly
+	var s CodingPlanStatusResponse
+	if err := json.Unmarshal(data, &s); err != nil {
+		return nil, fmt.Errorf("parse codingplan status: %w", err)
+	}
+	return &s, nil
+}
+
+// RefreshToken attempts to refresh the daemon's auth token.
+// Returns true if the token was refreshed or is still valid.
+func (c *Client) RefreshToken() (bool, error) {
+	auth, err := c.AuthStatus()
+	if err != nil {
+		return false, fmt.Errorf("auth status check failed: %w", err)
+	}
+	if auth.LoggedIn && auth.Token != nil && auth.Token.ExpiresIn > 60 {
+		return true, nil
+	}
+	return false, fmt.Errorf("token expired or not logged in")
+}
+
 // ─── Models / Providers ──────────────────────────────────────────────────────
 
 func (c *Client) ListModels() ([]ModelInfo, error) {

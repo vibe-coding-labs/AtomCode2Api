@@ -21,6 +21,7 @@ import (
 	"github.com/vibe-coding-labs/AtomCode2API/pkg/atmc"
 	"github.com/vibe-coding-labs/AtomCode2API/pkg/auth"
 	"github.com/vibe-coding-labs/AtomCode2API/pkg/dashboard"
+	"github.com/vibe-coding-labs/AtomCode2API/pkg/keepalive"
 	"github.com/vibe-coding-labs/AtomCode2API/pkg/openai"
 	"github.com/vibe-coding-labs/AtomCode2API/pkg/store"
 )
@@ -93,6 +94,11 @@ func runServe() error {
 
 	srv := openai.NewServer(client, s)
 	anth := anthropic.NewHandler(client, s)
+
+	// Start credential keepalive (every 10 minutes)
+	keeper := keepalive.NewKeeper(auth.NewDaemonCredentialRefresher(daemonURL), 10*time.Minute)
+	keeper.Start()
+
 	dash := dashboard.NewHandler(s, nil, nil, client)
 
 	mux := http.NewServeMux()
