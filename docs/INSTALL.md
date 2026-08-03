@@ -1,4 +1,4 @@
-# AtomCode2API — AI Agent 安装指南
+# AtomCode2API — 安装指南
 
 > 本文档是为 AI 编程助手（Claude Code、Codex、Cursor 等）准备的安装引导。
 > 目标是让 AI agent 根据用户环境自动选择最佳的安装方式，完成部署。

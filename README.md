@@ -2,7 +2,7 @@
 
 嗨，你好。如果你点进来了，大概是因为你也在用 AtomCode 的免费额度，想把它用到别的工具上？那来对地方了。
 
-> **想让你的 AI agent 帮你搭？** 把 [docs/guides/AGENTS.md](docs/guides/AGENTS.md) 的链接或内容发给它，它会根据你的系统环境自动选择 Docker / 源码编译 / 下载二进制三种方式之一来完成安装。
+> **想让你的 AI agent 帮你搭？** 把 [docs/INSTALL.md](https://github.com/vibe-coding-labs/AtomCode2Api/blob/main/docs/INSTALL.md) 的完整链接发给它，AI 会读取文档并根据你的系统环境自动选择 Docker / 源码编译 / 下载二进制三种方式之一来完成安装。
 
 ## 能用哪些模型？全都是免费的
 
